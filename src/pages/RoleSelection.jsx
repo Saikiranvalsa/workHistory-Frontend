@@ -1,89 +1,100 @@
 import { useNavigate } from "react-router-dom";
 
 function RoleSelection() {
-
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-slate-100 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-slate-50 flex justify-center px-4 py-6 md:py-10">
 
-      <div className="w-full max-w-3xl">
+      <div className="w-full max-w-2xl">
 
-        {/* Header */}
-        <div className="text-center mb-10">
+        {/* ================= TITLE ================= */}
+        <div className="text-center mb-6 md:mb-8">
 
-          <h1 className="text-4xl font-bold text-green-600">
+          <h1 className="text-3xl md:text-4xl font-bold text-green-600">
             WorkHistory
           </h1>
 
-          <p className="text-gray-500 mt-3 text-lg">
+          <p className="mt-2 text-base md:text-lg text-slate-500">
             How do you want to use WorkHistory?
           </p>
 
         </div>
 
+        {/* ================= OWNER ================= */}
+        <button
+          onClick={() => navigate("/owner")}
+          className="
+            w-full
+            bg-white
+            border
+            border-slate-300
+            rounded-2xl
+            p-6
+            md:p-8
+            mb-5
+            text-left
+            hover:border-green-500
+            hover:shadow-lg
+            transition
+          "
+        >
 
-        {/* Roles */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="text-4xl md:text-5xl mb-4">
+            👨‍🌾
+          </div>
 
-          {/* Owner */}
-          <button
-            onClick={() => navigate("/owner")}
-            className="bg-white rounded-2xl p-8 shadow-md
-                       hover:shadow-xl hover:-translate-y-1
-                       transition text-left border
-                       hover:border-green-500"
-          >
+          <h2 className="text-2xl md:text-3xl font-bold text-slate-900">
+            Owner
+          </h2>
 
-            <div className="text-5xl mb-5">
-              👨‍🌾
-            </div>
+          <p className="mt-3 text-base md:text-lg text-slate-500 leading-relaxed">
+            Add work, manage customers, track payments
+            and view your complete work history.
+          </p>
 
-            <h2 className="text-2xl font-bold text-gray-800">
-              Owner
-            </h2>
+          <div className="mt-5 text-green-600 font-bold text-base md:text-lg">
+            Continue as Owner →
+          </div>
 
-            <p className="text-gray-500 mt-3">
-              Add work, manage customers, track payments
-              and view your complete work history.
-            </p>
+        </button>
 
-            <div className="mt-6 text-green-600 font-semibold">
-              Continue as Owner →
-            </div>
+        {/* ================= CUSTOMER ================= */}
+        <button
+          onClick={() => navigate("/customer")}
+          className="
+            w-full
+            bg-white
+            border
+            border-slate-300
+            rounded-2xl
+            p-6
+            md:p-8
+            text-left
+            hover:border-green-500
+            hover:shadow-lg
+            transition
+          "
+        >
 
-          </button>
+          <div className="text-4xl md:text-5xl mb-4">
+            👤
+          </div>
 
+          <h2 className="text-2xl md:text-3xl font-bold text-slate-900">
+            Customer
+          </h2>
 
-          {/* Customer */}
-          <button
-            onClick={() => navigate("/customer")}
-            className="bg-white rounded-2xl p-8 shadow-md
-                       hover:shadow-xl hover:-translate-y-1
-                       transition text-left border
-                       hover:border-blue-500"
-          >
+          <p className="mt-3 text-base md:text-lg text-slate-500 leading-relaxed">
+            View your work, payments, pending amounts
+            and complete work history.
+          </p>
 
-            <div className="text-5xl mb-5">
-              👤
-            </div>
+          <div className="mt-5 text-green-600 font-bold text-base md:text-lg">
+            Continue as Customer →
+          </div>
 
-            <h2 className="text-2xl font-bold text-gray-800">
-              Customer
-            </h2>
-
-            <p className="text-gray-500 mt-3">
-              View your work, payments, pending amounts
-              and complete work history.
-            </p>
-
-            <div className="mt-6 text-blue-600 font-semibold">
-              Continue as Customer →
-            </div>
-
-          </button>
-
-        </div>
+        </button>
 
       </div>
 

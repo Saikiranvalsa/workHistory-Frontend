@@ -1,42 +1,237 @@
-import { useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import {
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
+
 import api from "../../services/api";
 
 function AddWorkDetails() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const vehicle = location.state?.vehicle || "";
-  const selectedCustomer = location.state?.customer || null;
-  const isNewCustomer = location.state?.newCustomer === true;
+  const vehicle =
+    location.state?.vehicle || "";
+
+  const selectedCustomer =
+    location.state?.customer || null;
+
+  const isNewCustomer =
+    location.state?.newCustomer === true;
+
+  // =====================================================
+  // FORM DATA
+  // =====================================================
 
   const [formData, setFormData] = useState({
-    customerName: selectedCustomer?.name || "",
-    customerNumber: selectedCustomer?.number || "",
+    customerName:
+      selectedCustomer?.name || "",
+
+    customerNumber:
+      selectedCustomer?.number || "",
+
     workType: "",
-    date: new Date().toISOString().split("T")[0],
+
+    date: new Date()
+      .toISOString()
+      .split("T")[0],
+
     acres: "",
+
     amount: "",
+
     paid: "",
   });
 
-  const [otp, setOtp] = useState("");
-  const [generatedOtp, setGeneratedOtp] = useState("");
-  const [otpSent, setOtpSent] = useState(false);
+  // =====================================================
+  // CUSTOMERS
+  // =====================================================
 
-  // Existing customer doesn't need OTP
-  const [otpVerified, setOtpVerified] = useState(!isNewCustomer);
+  const [customers, setCustomers] =
+    useState([]);
 
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
+  const [customerExists, setCustomerExists] =
+    useState(
+      !isNewCustomer &&
+        !!selectedCustomer
+    );
 
-  // ============================
-  // INPUT CHANGE
-  // ============================
+  const [checkingCustomer, setCheckingCustomer] =
+    useState(false);
+
+  // =====================================================
+  // OTP
+  // =====================================================
+
+  const [otp, setOtp] =
+    useState("");
+
+  const [generatedOtp, setGeneratedOtp] =
+    useState("");
+
+  const [otpSent, setOtpSent] =
+    useState(false);
+
+  const [otpVerified, setOtpVerified] =
+    useState(!isNewCustomer);
+
+  // =====================================================
+  // OTHER STATES
+  // =====================================================
+
+  const [saving, setSaving] =
+    useState(false);
+
+  const [error, setError] =
+    useState("");
+
+  const [message, setMessage] =
+    useState("");
+
+  // =====================================================
+  // LOAD CUSTOMERS
+  // =====================================================
+
+  useEffect(() => {
+    loadCustomers();
+  }, []);
+
+  const loadCustomers = async () => {
+    try {
+      const response =
+        await api.get(
+          "/owner/mycustomers"
+        );
+
+      console.log(
+        "MY CUSTOMERS:",
+        response.data
+      );
+
+      setCustomers(
+        Array.isArray(response.data)
+          ? response.data
+          : []
+      );
+    } catch (err) {
+      console.error(
+        "CUSTOMER LOAD ERROR:",
+        err
+      );
+    }
+  };
+
+  // =====================================================
+  // NORMALIZE PHONE NUMBER
+  // =====================================================
+
+  const normalizeNumber = (
+    number
+  ) => {
+    return String(
+      number || ""
+    ).replace(/\D/g, "");
+  };
+
+  // =====================================================
+  // FIND EXISTING CUSTOMER
+  // =====================================================
+
+  const findExistingCustomer = (
+    number
+  ) => {
+    const cleanNumber =
+      normalizeNumber(number);
+
+    if (
+      cleanNumber.length !== 10
+    ) {
+      return null;
+    }
+
+    return (
+      customers.find(
+        (customer) => {
+          const existingNumber =
+            normalizeNumber(
+              customer.number
+            );
+
+          return (
+            existingNumber ===
+            cleanNumber
+          );
+        }
+      ) || null
+    );
+  };
+
+  // =====================================================
+  // CHECK CUSTOMER AFTER LIST LOADS
+  // =====================================================
+
+  useEffect(() => {
+    if (!isNewCustomer) {
+      return;
+    }
+
+    if (
+      formData.customerNumber.length !==
+      10
+    ) {
+      return;
+    }
+
+    if (
+      customers.length === 0
+    ) {
+      return;
+    }
+
+    const foundCustomer =
+      findExistingCustomer(
+        formData.customerNumber
+      );
+
+    if (foundCustomer) {
+      console.log(
+        "EXISTING CUSTOMER:",
+        foundCustomer
+      );
+
+      setFormData((prev) => ({
+        ...prev,
+        customerName:
+          foundCustomer.name || "",
+      }));
+
+      setCustomerExists(true);
+
+      // Existing customer does not need OTP
+      setOtpVerified(true);
+
+      setOtpSent(false);
+      setGeneratedOtp("");
+      setOtp("");
+
+      // Prevent duplicate message
+      setMessage("");
+    }
+  }, [
+    customers,
+    formData.customerNumber,
+    isNewCustomer,
+  ]);
+
+  // =====================================================
+  // NORMAL INPUT CHANGE
+  // =====================================================
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    const {
+      name,
+      value,
+    } = e.target;
 
     setFormData((prev) => ({
       ...prev,
@@ -46,84 +241,209 @@ function AddWorkDetails() {
     setError("");
   };
 
-  // ============================
+  // =====================================================
+  // CUSTOMER NUMBER CHANGE
+  // =====================================================
+
+  const handleCustomerNumberChange = (
+    e
+  ) => {
+    const value =
+      e.target.value
+        .replace(/\D/g, "")
+        .slice(0, 10);
+
+    setFormData((prev) => ({
+      ...prev,
+      customerNumber: value,
+    }));
+
+    setError("");
+    setMessage("");
+
+    if (!isNewCustomer) {
+      return;
+    }
+
+    // Reset previous customer / OTP status
+    setOtpSent(false);
+    setGeneratedOtp("");
+    setOtp("");
+    setOtpVerified(false);
+    setCustomerExists(false);
+
+    if (
+      value.length !== 10
+    ) {
+      return;
+    }
+
+    setCheckingCustomer(true);
+
+    const foundCustomer =
+      findExistingCustomer(value);
+
+    console.log(
+      "CHECKING NUMBER:",
+      value
+    );
+
+    console.log(
+      "FOUND CUSTOMER:",
+      foundCustomer
+    );
+
+    if (foundCustomer) {
+      // =================================================
+      // EXISTING CUSTOMER
+      // =================================================
+
+      setFormData((prev) => ({
+        ...prev,
+        customerNumber: value,
+        customerName:
+          foundCustomer.name || "",
+      }));
+
+      setCustomerExists(true);
+
+      // Existing customer = no OTP
+      setOtpVerified(true);
+
+      setOtpSent(false);
+      setGeneratedOtp("");
+      setOtp("");
+
+      setMessage("");
+
+    } else {
+      // =================================================
+      // NEW CUSTOMER
+      // =================================================
+
+      setCustomerExists(false);
+      setOtpVerified(false);
+      setMessage("");
+    }
+
+    setCheckingCustomer(false);
+  };
+
+  // =====================================================
   // SEND OTP
-  // ============================
+  // =====================================================
 
   const handleSendOtp = () => {
     setError("");
     setMessage("");
 
-    if (!formData.customerName.trim()) {
-      setError("Please enter customer name.");
+    // Existing customer never needs OTP
+    if (customerExists) {
+      setOtpVerified(true);
       return;
     }
 
-    if (!formData.customerNumber.trim()) {
-      setError("Please enter customer mobile number.");
+    if (
+      !formData.customerName.trim()
+    ) {
+      setError(
+        "Please enter customer name."
+      );
       return;
     }
 
-    if (!/^[6-9]\d{9}$/.test(formData.customerNumber)) {
-      setError("Please enter a valid 10-digit mobile number.");
+    if (
+      !formData.customerNumber.trim()
+    ) {
+      setError(
+        "Please enter customer mobile number."
+      );
       return;
     }
 
-    // Generate 6 digit OTP
-    const newOtp = Math.floor(
-      100000 + Math.random() * 900000
-    ).toString();
+    if (
+      !/^[6-9]\d{9}$/.test(
+        formData.customerNumber
+      )
+    ) {
+      setError(
+        "Please enter a valid 10-digit mobile number."
+      );
+      return;
+    }
+
+    // Development OTP
+    const newOtp =
+      Math.floor(
+        100000 +
+          Math.random() *
+            900000
+      ).toString();
 
     setGeneratedOtp(newOtp);
     setOtp("");
     setOtpSent(true);
     setOtpVerified(false);
 
-    // Development testing only
-    console.log("NEW CUSTOMER OTP:", newOtp);
+    console.log(
+      "NEW CUSTOMER OTP:",
+      newOtp
+    );
 
     setMessage(
       `Development OTP: ${newOtp}`
     );
   };
 
-  // ============================
+  // =====================================================
   // VERIFY OTP
-  // ============================
+  // =====================================================
 
   const handleVerifyOtp = () => {
     setError("");
     setMessage("");
 
     if (!otp) {
-      setError("Please enter OTP.");
+      setError(
+        "Please enter OTP."
+      );
       return;
     }
 
-    if (otp !== generatedOtp) {
-      setError("Invalid OTP. Please try again.");
+    if (
+      otp !== generatedOtp
+    ) {
+      setError(
+        "Invalid OTP. Please try again."
+      );
       return;
     }
 
     setOtpVerified(true);
+    setOtpSent(false);
 
     setMessage(
       "Mobile number verified successfully."
     );
   };
 
-  // ============================
+  // =====================================================
   // SAVE WORK
-  // ============================
+  // =====================================================
 
-  const handleSaveWork = async (e) => {
+  const handleSaveWork = async (
+    e
+  ) => {
     e.preventDefault();
 
     setError("");
     setMessage("");
 
     // New customer must verify OTP
-    if (isNewCustomer && !otpVerified) {
+    if (
+      isNewCustomer &&
+      !otpVerified
+    ) {
       setError(
         "Please verify the customer mobile number first."
       );
@@ -131,98 +451,195 @@ function AddWorkDetails() {
     }
 
     if (!vehicle) {
-      setError("Vehicle information is missing.");
+      setError(
+        "Vehicle information is missing."
+      );
       return;
     }
 
-    if (!formData.customerName.trim()) {
-      setError("Customer name is required.");
+    if (
+      !formData.customerName.trim()
+    ) {
+      setError(
+        "Customer name is required."
+      );
       return;
     }
 
-    if (!formData.customerNumber.trim()) {
-      setError("Customer mobile number is required.");
+    if (
+      !formData.customerNumber.trim()
+    ) {
+      setError(
+        "Customer mobile number is required."
+      );
       return;
     }
 
     if (!formData.workType) {
-      setError("Please select work type.");
+      setError(
+        "Please select work type."
+      );
       return;
     }
 
     if (!formData.date) {
-      setError("Please select work date.");
+      setError(
+        "Please select work date."
+      );
       return;
     }
 
-    if (!formData.amount || Number(formData.amount) <= 0) {
-      setError("Please enter a valid amount.");
+    if (
+      !formData.amount ||
+      Number(formData.amount) <= 0
+    ) {
+      setError(
+        "Please enter a valid amount."
+      );
       return;
     }
 
-    const totalAmount = Number(formData.amount);
-    const paidAmount = Number(formData.paid || 0);
+    const totalAmount =
+      Number(formData.amount);
+
+    // =====================================================
+    // PAID
+    //
+    // Empty = 0
+    // Entered = entered amount
+    // =====================================================
+
+    const paidAmount =
+      formData.paid === "" ||
+      formData.paid === null ||
+      formData.paid === undefined
+        ? 0
+        : Number(formData.paid);
 
     if (paidAmount < 0) {
-      setError("Paid amount cannot be negative.");
+      setError(
+        "Paid amount cannot be negative."
+      );
       return;
     }
 
-    if (paidAmount > totalAmount) {
+    if (
+      paidAmount > totalAmount
+    ) {
       setError(
         "Paid amount cannot be greater than total amount."
       );
       return;
     }
 
-    let acresValue = Number(formData.acres || 0);
+    // =====================================================
+    // ACRES
+    //
+    // Default = 0
+    // =====================================================
 
-    if (
-      (vehicle === "Tractor" ||
-        vehicle === "Harvester") &&
-      (!formData.acres ||
-        Number(formData.acres) <= 0)
-    ) {
-      setError("Please enter acres.");
-      return;
+    let acresValue = 0;
+
+    /*
+      Acres required:
+
+      Tractor + Ploughing
+      Tractor + Cultivation
+      Tractor + Rotavator
+      Tractor + Harvesting
+
+      Harvester + non-Transport work
+
+      Acres = 0:
+
+      Tractor + Transport
+      JCB
+      Magic
+      Car / EV
+      Others
+    */
+
+    const requiresAcres =
+      (
+        vehicle === "Tractor" ||
+        vehicle === "Harvester"
+      ) &&
+      formData.workType !==
+        "Transport";
+
+    if (requiresAcres) {
+
+      if (
+        !formData.acres ||
+        Number(formData.acres) <= 0
+      ) {
+        setError(
+          "Please enter acres."
+        );
+        return;
+      }
+
+      acresValue =
+        Number(formData.acres);
     }
 
-    // Your backend requires acres NOT NULL.
-    // So use 0 for vehicles where acres doesn't apply.
+    // Transport = 0 acres
     if (
-      vehicle !== "Tractor" &&
-      vehicle !== "Harvester"
+      formData.workType ===
+      "Transport"
     ) {
       acresValue = 0;
     }
 
+    // =====================================================
+    // WORK DATA
+    //
+    // NO DUE FIELD
+    // =====================================================
+
     const workData = {
       machine: vehicle,
-      workType: formData.workType,
+
+      workType:
+        formData.workType,
+
       date: formData.date,
+
       amount: totalAmount,
+
       acres: acresValue,
+
       paid: paidAmount,
-      customerName: formData.customerName.trim(),
-      customerNumber: formData.customerNumber.trim(),
+
+      customerName:
+        formData.customerName.trim(),
+
+      customerNumber:
+        formData.customerNumber.trim(),
     };
 
-    console.log("WORK DATA:", workData);
+    console.log(
+      "WORK DATA:",
+      workData
+    );
 
     try {
       setSaving(true);
 
-      const response = await api.post(
-        "/work",
-        workData
-      );
+      const response =
+        await api.post(
+          "/work",
+          workData
+        );
 
       console.log(
         "SAVE WORK RESPONSE:",
         response.data
       );
 
-      alert("Work added successfully!");
+      alert(
+        "Work added successfully!"
+      );
 
       navigate("/owner");
 
@@ -232,36 +649,59 @@ function AddWorkDetails() {
         err
       );
 
-      if (err.response?.status === 401) {
-        localStorage.removeItem("JWT_TOKEN");
+      if (
+        err.response?.status ===
+        401
+      ) {
+        localStorage.removeItem(
+          "JWT_TOKEN"
+        );
+
         navigate("/login");
+
         return;
       }
 
       setError(
-        err.response?.data?.message ||
+        err.response?.data
+          ?.message ||
           err.response?.data ||
           "Failed to save work."
       );
+
     } finally {
       setSaving(false);
     }
   };
 
-  // ============================
+  // =====================================================
   // DUE
-  // ============================
+  //
+  // Empty paid is 0
+  // =====================================================
 
   const due =
-    Number(formData.amount || 0) -
-    Number(formData.paid || 0);
+    Number(
+      formData.amount || 0
+    ) -
+    Number(
+      formData.paid || 0
+    );
 
-  const workTypes = getWorkTypes(vehicle);
+  const workTypes =
+    getWorkTypes(vehicle);
+
+  // =====================================================
+  // UI
+  // =====================================================
 
   return (
     <div className="min-h-screen bg-slate-50">
 
-      {/* HEADER */}
+      {/* =================================================
+          HEADER
+      ================================================= */}
+
       <header className="bg-green-700 text-white">
 
         <div className="max-w-3xl mx-auto px-4">
@@ -274,11 +714,22 @@ function AddWorkDetails() {
                 navigate(
                   "/owner/customer-history",
                   {
-                    state: { vehicle },
+                    state: {
+                      vehicle,
+                    },
                   }
                 )
               }
-              className="w-10 h-10 rounded-full flex items-center justify-center text-2xl hover:bg-green-600"
+              className="
+                w-10
+                h-10
+                rounded-full
+                flex
+                items-center
+                justify-center
+                text-2xl
+                hover:bg-green-600
+              "
             >
               ←
             </button>
@@ -301,20 +752,28 @@ function AddWorkDetails() {
 
       </header>
 
+      {/* =================================================
+          MAIN
+      ================================================= */}
+
       <main className="max-w-3xl mx-auto px-4 py-6 pb-10">
 
-        <form onSubmit={handleSaveWork}>
+        <form
+          onSubmit={handleSaveWork}
+        >
 
-          {/* ============================
+          {/* =================================================
               VEHICLE
-          ============================ */}
+          ================================================= */}
 
           <section className="bg-white border rounded-2xl p-5 shadow-sm mb-5">
 
             <div className="flex items-center gap-4">
 
               <div className="w-14 h-14 rounded-xl bg-green-50 flex items-center justify-center text-3xl">
-                {getVehicleIcon(vehicle)}
+                {getVehicleIcon(
+                  vehicle
+                )}
               </div>
 
               <div>
@@ -333,39 +792,57 @@ function AddWorkDetails() {
 
           </section>
 
-          {/* ============================
+          {/* =================================================
               CUSTOMER DETAILS
-          ============================ */}
+          ================================================= */}
 
           <section className="bg-white border rounded-2xl p-5 shadow-sm mb-5">
 
-            <div className="flex items-start justify-between mb-5">
+            <div className="flex items-start justify-between gap-3 mb-5">
 
-              <div>
+              <div className="min-w-0">
 
                 <h2 className="text-lg font-bold text-gray-900">
                   Customer Details
                 </h2>
 
                 <p className="text-xs text-gray-500 mt-1">
-                  {isNewCustomer
+
+                  {customerExists
+                    ? "Existing customer found automatically."
+                    : isNewCustomer
                     ? "Enter new customer details and verify mobile number."
                     : "Customer selected from your history."}
+
                 </p>
 
               </div>
 
               {!isNewCustomer && (
-                <span className="px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold">
+
+                <span className="px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold shrink-0">
                   Selected
                 </span>
+
               )}
 
               {isNewCustomer &&
+                customerExists && (
+
+                  <span className="px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold shrink-0">
+                    Existing
+                  </span>
+
+                )}
+
+              {isNewCustomer &&
+                !customerExists &&
                 otpVerified && (
-                  <span className="px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold">
+
+                  <span className="px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold shrink-0">
                     Verified
                   </span>
+
                 )}
 
             </div>
@@ -381,15 +858,31 @@ function AddWorkDetails() {
               <input
                 type="text"
                 name="customerName"
-                value={formData.customerName}
-                onChange={handleChange}
-                readOnly={!isNewCustomer}
+                value={
+                  formData.customerName
+                }
+                onChange={
+                  handleChange
+                }
+                readOnly={
+                  !isNewCustomer ||
+                  customerExists
+                }
                 placeholder="Enter customer name"
-                className={`w-full border rounded-xl px-4 py-3 outline-none ${
-                  !isNewCustomer
-                    ? "bg-gray-100 border-gray-300"
-                    : "bg-white border-gray-300 focus:border-green-500 focus:ring-2 focus:ring-green-100"
-                }`}
+                className={`
+                  w-full
+                  border
+                  rounded-xl
+                  px-4
+                  py-3
+                  outline-none
+                  ${
+                    !isNewCustomer ||
+                    customerExists
+                      ? "bg-gray-100 border-gray-300"
+                      : "bg-white border-gray-300 focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                  }
+                `}
               />
 
             </div>
@@ -402,58 +895,66 @@ function AddWorkDetails() {
                 Customer Mobile Number
               </label>
 
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2 w-full">
 
                 <input
                   type="tel"
                   name="customerNumber"
-                  value={formData.customerNumber}
-                  onChange={(e) => {
-
-                    const value =
-                      e.target.value
-                        .replace(/\D/g, "")
-                        .slice(0, 10);
-
-                    setFormData((prev) => ({
-                      ...prev,
-                      customerNumber: value,
-                    }));
-
-                    if (isNewCustomer) {
-                      setOtpSent(false);
-                      setGeneratedOtp("");
-                      setOtp("");
-                      setOtpVerified(false);
-                    }
-
-                    setError("");
-                    setMessage("");
-
-                  }}
+                  value={
+                    formData.customerNumber
+                  }
+                  onChange={
+                    handleCustomerNumberChange
+                  }
                   readOnly={
                     !isNewCustomer ||
                     otpVerified
                   }
                   maxLength={10}
+                  inputMode="numeric"
                   placeholder="Enter 10-digit mobile number"
-                  className={`flex-1 border rounded-xl px-4 py-3 outline-none ${
-                    !isNewCustomer ||
-                    otpVerified
-                      ? "bg-gray-100 border-gray-300"
-                      : "bg-white border-gray-300 focus:border-green-500 focus:ring-2 focus:ring-green-100"
-                  }`}
+                  className={`
+                    w-full
+                    min-w-0
+                    border
+                    rounded-xl
+                    px-4
+                    py-3
+                    outline-none
+                    ${
+                      !isNewCustomer ||
+                      otpVerified
+                        ? "bg-gray-100 border-gray-300"
+                        : "bg-white border-gray-300 focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                    }
+                  `}
                 />
 
                 {/* SEND OTP */}
 
                 {isNewCustomer &&
+                  !customerExists &&
                   !otpVerified && (
 
                     <button
                       type="button"
-                      onClick={handleSendOtp}
-                      className="px-5 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold whitespace-nowrap"
+                      onClick={
+                        handleSendOtp
+                      }
+                      className="
+                        w-full
+                        sm:w-auto
+                        sm:min-w-[120px]
+                        px-5
+                        py-3
+                        bg-green-600
+                        hover:bg-green-700
+                        text-white
+                        rounded-xl
+                        font-bold
+                        whitespace-nowrap
+                        shrink-0
+                      "
                     >
                       Send OTP
                     </button>
@@ -462,17 +963,48 @@ function AddWorkDetails() {
 
               </div>
 
+              {/* CHECKING */}
+
+              {checkingCustomer && (
+
+                <p className="mt-2 text-xs text-gray-500">
+                  Checking customer...
+                </p>
+
+              )}
+
+              {/* EXISTING CUSTOMER */}
+
+              {isNewCustomer &&
+                customerExists && (
+
+                  <div className="mt-3 bg-green-50 border border-green-200 rounded-xl p-3">
+
+                    <p className="text-sm font-semibold text-green-700">
+                      ✓ Existing customer found
+                    </p>
+
+                    <p className="text-xs text-green-600 mt-1">
+                      Customer name has been filled
+                      automatically. OTP is not required.
+                    </p>
+
+                  </div>
+
+                )}
+
             </div>
 
-            {/* ============================
-                OTP
-            ============================ */}
+            {/* =================================================
+                OTP BOX
+            ================================================= */}
 
             {isNewCustomer &&
+              !customerExists &&
               otpSent &&
               !otpVerified && (
 
-                <div className="mt-5">
+                <div className="mt-5 w-full bg-slate-50 border border-slate-200 rounded-xl p-4">
 
                   <label className="block text-sm font-semibold text-gray-800 mb-2">
                     Enter OTP
@@ -482,33 +1014,73 @@ function AddWorkDetails() {
                     type="text"
                     value={otp}
                     maxLength={6}
+                    inputMode="numeric"
                     onChange={(e) => {
 
                       setOtp(
                         e.target.value
-                          .replace(/\D/g, "")
-                          .slice(0, 6)
+                          .replace(
+                            /\D/g,
+                            ""
+                          )
+                          .slice(
+                            0,
+                            6
+                          )
                       );
 
                       setError("");
 
                     }}
                     placeholder="Enter 6-digit OTP"
-                    className="w-full border border-gray-300 rounded-xl px-4 py-3 text-center text-xl tracking-[0.5em] outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                    className="
+                      w-full
+                      border
+                      border-gray-300
+                      rounded-xl
+                      px-4
+                      py-3
+                      text-center
+                      text-xl
+                      tracking-[0.5em]
+                      outline-none
+                      focus:border-green-500
+                      focus:ring-2
+                      focus:ring-green-100
+                    "
                   />
 
                   <button
                     type="button"
-                    onClick={handleVerifyOtp}
-                    className="w-full mt-4 bg-green-600 hover:bg-green-700 text-white py-3.5 rounded-xl font-bold"
+                    onClick={
+                      handleVerifyOtp
+                    }
+                    className="
+                      w-full
+                      mt-4
+                      bg-green-600
+                      hover:bg-green-700
+                      text-white
+                      py-3.5
+                      rounded-xl
+                      font-bold
+                    "
                   >
                     Verify OTP
                   </button>
 
                   <button
                     type="button"
-                    onClick={handleSendOtp}
-                    className="w-full mt-3 text-green-700 text-sm font-semibold"
+                    onClick={
+                      handleSendOtp
+                    }
+                    className="
+                      w-full
+                      mt-3
+                      text-green-700
+                      text-sm
+                      font-semibold
+                    "
                   >
                     Resend OTP
                   </button>
@@ -517,14 +1089,15 @@ function AddWorkDetails() {
 
               )}
 
-            {/* DEVELOPMENT OTP */}
+            {/* NEW CUSTOMER OTP MESSAGE */}
 
             {isNewCustomer &&
+              !customerExists &&
               message && (
 
                 <div className="mt-4 bg-green-50 border border-green-200 rounded-xl p-3">
 
-                  <p className="text-sm text-green-700">
+                  <p className="text-sm text-green-700 break-words">
                     {message}
                   </p>
 
@@ -534,9 +1107,9 @@ function AddWorkDetails() {
 
           </section>
 
-          {/* ============================
+          {/* =================================================
               WORK DETAILS
-          ============================ */}
+          ================================================= */}
 
           <section className="bg-white border rounded-2xl p-5 shadow-sm mb-5">
 
@@ -554,23 +1127,43 @@ function AddWorkDetails() {
 
               <select
                 name="workType"
-                value={formData.workType}
-                onChange={handleChange}
-                className="w-full border border-gray-300 rounded-xl px-4 py-3 bg-white outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                value={
+                  formData.workType
+                }
+                onChange={
+                  handleChange
+                }
+                className="
+                  w-full
+                  border
+                  border-gray-300
+                  rounded-xl
+                  px-4
+                  py-3
+                  bg-white
+                  outline-none
+                  focus:border-green-500
+                  focus:ring-2
+                  focus:ring-green-100
+                "
               >
 
                 <option value="">
                   Select work type
                 </option>
 
-                {workTypes.map((type) => (
-                  <option
-                    key={type}
-                    value={type}
-                  >
-                    {type}
-                  </option>
-                ))}
+                {workTypes.map(
+                  (type) => (
+
+                    <option
+                      key={type}
+                      value={type}
+                    >
+                      {type}
+                    </option>
+
+                  )
+                )}
 
               </select>
 
@@ -587,44 +1180,79 @@ function AddWorkDetails() {
               <input
                 type="date"
                 name="date"
-                value={formData.date}
-                onChange={handleChange}
-                className="w-full border border-gray-300 rounded-xl px-4 py-3 outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                value={
+                  formData.date
+                }
+                onChange={
+                  handleChange
+                }
+                className="
+                  w-full
+                  border
+                  border-gray-300
+                  rounded-xl
+                  px-4
+                  py-3
+                  outline-none
+                  focus:border-green-500
+                  focus:ring-2
+                  focus:ring-green-100
+                "
               />
 
             </div>
 
-            {/* ACRES */}
+            {/* =================================================
+                ACRES
+                HIDDEN FOR TRANSPORT
+            ================================================= */}
 
             {(vehicle === "Tractor" ||
-              vehicle === "Harvester") && (
+              vehicle === "Harvester") &&
+              formData.workType !==
+                "Transport" && (
 
-              <div>
+                <div>
 
-                <label className="block text-sm font-semibold text-gray-800 mb-2">
-                  Acres
-                </label>
+                  <label className="block text-sm font-semibold text-gray-800 mb-2">
+                    Acres
+                  </label>
 
-                <input
-                  type="number"
-                  name="acres"
-                  value={formData.acres}
-                  onChange={handleChange}
-                  min="0"
-                  step="0.01"
-                  placeholder="Enter acres"
-                  className="w-full border border-gray-300 rounded-xl px-4 py-3 outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100"
-                />
+                  <input
+                    type="number"
+                    name="acres"
+                    value={
+                      formData.acres
+                    }
+                    onChange={
+                      handleChange
+                    }
+                    min="0"
+                    step="0.01"
+                    placeholder="Enter acres"
+                    className="
+                      w-full
+                      border
+                      border-gray-300
+                      rounded-xl
+                      px-4
+                      py-3
+                      outline-none
+                      focus:border-green-500
+                      focus:ring-2
+                      focus:ring-green-100
+                    "
+                  />
 
-              </div>
+                </div>
 
-            )}
+              )}
 
           </section>
 
-          {/* ============================
-              PAYMENT
-          ============================ */}
+          {/* =================================================
+              PAYMENT DETAILS
+          ================================================= */}
 
           <section className="bg-white border rounded-2xl p-5 shadow-sm mb-5">
 
@@ -649,19 +1277,35 @@ function AddWorkDetails() {
                 <input
                   type="number"
                   name="amount"
-                  value={formData.amount}
-                  onChange={handleChange}
+                  value={
+                    formData.amount
+                  }
+                  onChange={
+                    handleChange
+                  }
                   min="0"
                   step="0.01"
                   placeholder="Enter total amount"
-                  className="w-full border border-gray-300 rounded-xl pl-10 pr-4 py-3 outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                  className="
+                    w-full
+                    border
+                    border-gray-300
+                    rounded-xl
+                    pl-10
+                    pr-4
+                    py-3
+                    outline-none
+                    focus:border-green-500
+                    focus:ring-2
+                    focus:ring-green-100
+                  "
                 />
 
               </div>
 
             </div>
 
-            {/* PAID */}
+            {/* PAID AMOUNT */}
 
             <div className="mb-5">
 
@@ -678,12 +1322,28 @@ function AddWorkDetails() {
                 <input
                   type="number"
                   name="paid"
-                  value={formData.paid}
-                  onChange={handleChange}
+                  value={
+                    formData.paid
+                  }
+                  onChange={
+                    handleChange
+                  }
                   min="0"
                   step="0.01"
                   placeholder="Enter paid amount"
-                  className="w-full border border-gray-300 rounded-xl pl-10 pr-4 py-3 outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                  className="
+                    w-full
+                    border
+                    border-gray-300
+                    rounded-xl
+                    pl-10
+                    pr-4
+                    py-3
+                    outline-none
+                    focus:border-green-500
+                    focus:ring-2
+                    focus:ring-green-100
+                  "
                 />
 
               </div>
@@ -707,18 +1367,24 @@ function AddWorkDetails() {
               </div>
 
               <p className="text-xl font-bold text-orange-600">
+
                 ₹
                 {Math.max(
                   due,
                   0
-                ).toLocaleString("en-IN")}
+                ).toLocaleString(
+                  "en-IN"
+                )}
+
               </p>
 
             </div>
 
           </section>
 
-          {/* ERROR */}
+          {/* =================================================
+              ERROR
+          ================================================= */}
 
           {error && (
 
@@ -732,26 +1398,43 @@ function AddWorkDetails() {
 
           )}
 
-          {/* SAVE */}
+          {/* =================================================
+              SAVE
+          ================================================= */}
 
           <button
             type="submit"
             disabled={
               saving ||
-              (isNewCustomer &&
-                !otpVerified)
+              (
+                isNewCustomer &&
+                !otpVerified
+              )
             }
-            className={`w-full rounded-2xl py-4 text-white font-bold text-base shadow-md ${
-              saving ||
-              (isNewCustomer &&
-                !otpVerified)
-                ? "bg-green-400 cursor-not-allowed"
-                : "bg-green-600 hover:bg-green-700"
-            }`}
+            className={`
+              w-full
+              rounded-2xl
+              py-4
+              text-white
+              font-bold
+              text-base
+              shadow-md
+              ${
+                saving ||
+                (
+                  isNewCustomer &&
+                  !otpVerified
+                )
+                  ? "bg-green-400 cursor-not-allowed"
+                  : "bg-green-600 hover:bg-green-700"
+              }
+            `}
           >
+
             {saving
               ? "Saving Work..."
               : "Save Work"}
+
           </button>
 
         </form>
@@ -762,12 +1445,15 @@ function AddWorkDetails() {
   );
 }
 
-/* ==========================================
-   WORK TYPES
-========================================== */
+// =====================================================
+// WORK TYPES
+// =====================================================
 
-function getWorkTypes(vehicle) {
+function getWorkTypes(
+  vehicle
+) {
   const workTypes = {
+
     Tractor: [
       "Ploughing",
       "Cultivation",
@@ -821,21 +1507,32 @@ function getWorkTypes(vehicle) {
   );
 }
 
-/* ==========================================
-   VEHICLE ICON
-========================================== */
+// =====================================================
+// VEHICLE ICON
+// =====================================================
 
-function getVehicleIcon(vehicle) {
+function getVehicleIcon(
+  vehicle
+) {
   const icons = {
+
     Tractor: "🚜",
+
     JCB: "🏗️",
+
     Harvester: "🌾",
+
     Magic: "🚐",
+
     "Car / EV": "🚗",
+
     Other: "🚛",
   };
 
-  return icons[vehicle] || "🚜";
+  return (
+    icons[vehicle] ||
+    "🚜"
+  );
 }
 
 export default AddWorkDetails;

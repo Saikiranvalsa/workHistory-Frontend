@@ -8,6 +8,11 @@ import OwnerDashboard from "./pages/owner/OwnerDashboard";
 import AddWork from "./pages/owner/AddWork";
 import AddWorkDetails from "./pages/owner/AddWorkDetails";
 import CustomerHistory from "./pages/owner/CustomerHistory";
+import OwnerWorkHistory from "./pages/owner/OwnerWorkHistory";
+import OwnerCustomers from "./pages/owner/OwnerCustomers";
+import CustomerDetails from "./pages/owner/CustomerDetails";
+import CustomerWorkHistory from "./pages/owner/CustomerWorkHistory";
+import CustomerDashboard from "./pages/customer/CustomerDashboard";
 function App() {
   return (
     <BrowserRouter>
@@ -61,6 +66,28 @@ function App() {
         <Route
           path="/owner/customer-history"
           element={<CustomerHistory />}
+        />
+        <Route
+          path="/owner/work-history"
+          element={<OwnerWorkHistory />}
+        />
+        <Route
+          path="/owner/customers"
+          element={<OwnerCustomers />}
+        />
+
+        <Route
+          path="/owner/customer-details"
+          element={<CustomerDetails />}
+        />
+
+        <Route
+          path="/owner/customer-history"
+          element={<CustomerWorkHistory />}
+        />
+        <Route
+          path="/customer"
+          element={<CustomerDashboard />}
         />
 
         

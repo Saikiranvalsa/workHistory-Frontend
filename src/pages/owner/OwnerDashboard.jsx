@@ -1,304 +1,762 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import api from "../../services/api";
 
 function OwnerDashboard() {
   const navigate = useNavigate();
-  const [menuOpen, setMenuOpen] = useState(false);
 
-  const goTo = (path) => {
-    setMenuOpen(false);
-    navigate(path);
+  const [works, setWorks] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // =====================================================
+  // LOAD WORKS
+  // =====================================================
+
+  useEffect(() => {
+    loadWorks();
+  }, []);
+
+  const loadWorks = async () => {
+    try {
+      setLoading(true);
+
+      const response = await api.get(
+        "/owner/works"
+      );
+
+      console.log(
+        "OWNER WORKS:",
+        response.data
+      );
+
+      setWorks(
+        Array.isArray(response.data)
+          ? response.data
+          : []
+      );
+
+    } catch (error) {
+      console.error(
+        "WORK LOAD ERROR:",
+        error
+      );
+
+      if (
+        error.response?.status === 401
+      ) {
+        localStorage.removeItem(
+          "JWT_TOKEN"
+        );
+
+        navigate("/login");
+      }
+
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("JWT_TOKEN");
-    navigate("/login");
+  // =====================================================
+  // VEHICLE NAME
+  // =====================================================
+
+  const formatVehicle = (machine) => {
+    if (!machine) {
+      return "Others";
+    }
+
+    const value = machine
+      .toString()
+      .trim()
+      .toLowerCase();
+
+    if (value === "tractor") {
+      return "Tractor";
+    }
+
+    if (value === "jcb") {
+      return "JCB";
+    }
+
+    if (value === "harvester") {
+      return "Harvester";
+    }
+
+    if (value === "magic") {
+      return "Magic";
+    }
+
+    if (
+      value === "car" ||
+      value === "car/ev" ||
+      value === "car / ev"
+    ) {
+      return "Car / EV";
+    }
+
+    if (
+      value === "other" ||
+      value === "others"
+    ) {
+      return "Others";
+    }
+
+    return machine;
   };
+
+  // =====================================================
+  // VEHICLE ICON
+  // =====================================================
+
+  const getVehicleIcon = (machine) => {
+    const vehicle =
+      formatVehicle(machine);
+
+    if (vehicle === "Tractor") {
+      return "🚜";
+    }
+
+    if (vehicle === "JCB") {
+      return "🏗️";
+    }
+
+    if (vehicle === "Harvester") {
+      return "🌾";
+    }
+
+    if (vehicle === "Magic") {
+      return "🚐";
+    }
+
+    if (vehicle === "Car / EV") {
+      return "🚗";
+    }
+
+    return "🚛";
+  };
+
+  // =====================================================
+  // OPEN PARTICULAR VEHICLE
+  // =====================================================
+
+  const openVehicleHistory = (
+    vehicle
+  ) => {
+    navigate(
+      "/owner/work-history",
+      {
+        state: {
+          vehicle: vehicle,
+          selectVehicleMode: false,
+        },
+      }
+    );
+  };
+
+  // =====================================================
+  // SEE ALL - VEHICLE SELECTION
+  // =====================================================
+
+  const openAllVehicles = () => {
+    navigate(
+      "/owner/work-history",
+      {
+        state: {
+          vehicle: "All",
+          selectVehicleMode: true,
+        },
+      }
+    );
+  };
+
+  // =====================================================
+  // RECENT WORK - SEE ALL
+  //
+  // Opens complete work history directly.
+  // =====================================================
+
+  const openRecentWorkHistory = () => {
+    navigate(
+      "/owner/work-history",
+      {
+        state: {
+          vehicle: "All",
+          selectVehicleMode: false,
+        },
+      }
+    );
+  };
+
+  // =====================================================
+  // MONEY
+  // =====================================================
+
+  const formatMoney = (
+    amount
+  ) => {
+    return `₹${Number(
+      amount || 0
+    ).toLocaleString(
+      "en-IN",
+      {
+        maximumFractionDigits: 2,
+      }
+    )}`;
+  };
+
+  // =====================================================
+  // DATE
+  // =====================================================
+
+  const formatDate = (
+    dateValue
+  ) => {
+    if (!dateValue) {
+      return "";
+    }
+
+    const date =
+      new Date(dateValue);
+
+    if (
+      Number.isNaN(
+        date.getTime()
+      )
+    ) {
+      return "";
+    }
+
+    const today =
+      new Date();
+
+    const todayStart =
+      new Date(
+        today.getFullYear(),
+        today.getMonth(),
+        today.getDate()
+      );
+
+    const workStart =
+      new Date(
+        date.getFullYear(),
+        date.getMonth(),
+        date.getDate()
+      );
+
+    const difference =
+      Math.floor(
+        (todayStart -
+          workStart) /
+          (1000 *
+            60 *
+            60 *
+            24)
+      );
+
+    if (
+      difference === 0
+    ) {
+      return "Today";
+    }
+
+    if (
+      difference === 1
+    ) {
+      return "Yesterday";
+    }
+
+    return date.toLocaleDateString(
+      "en-IN",
+      {
+        day: "2-digit",
+        month: "short",
+      }
+    );
+  };
+
+  // =====================================================
+  // RECENT WORK
+  // =====================================================
+
+  const recentWorks =
+    useMemo(() => {
+      return [...works]
+        .sort(
+          (a, b) =>
+            new Date(
+              b.date || 0
+            ) -
+            new Date(
+              a.date || 0
+            )
+        )
+        .slice(0, 3);
+    }, [works]);
+
+  // =====================================================
+  // VEHICLE TOTALS
+  // =====================================================
+
+  const vehicleTotals =
+    useMemo(() => {
+      const totals = {};
+
+      works.forEach(
+        (work) => {
+          const vehicle =
+            formatVehicle(
+              work.machine
+            );
+
+          if (
+            !totals[vehicle]
+          ) {
+            totals[vehicle] = 0;
+          }
+
+          totals[vehicle] +=
+            Number(
+              work.amount || 0
+            );
+        }
+      );
+
+      return totals;
+    }, [works]);
+
+  // =====================================================
+  // CURRENT YEAR
+  // =====================================================
+
+  const currentYear =
+    new Date().getFullYear();
+
+  const currentYearWorks =
+    useMemo(() => {
+      return works.filter(
+        (work) => {
+          if (!work.date) {
+            return false;
+          }
+
+          const workDate =
+            new Date(
+              work.date
+            );
+
+          return (
+            workDate.getFullYear() ===
+            currentYear
+          );
+        }
+      );
+    }, [
+      works,
+      currentYear,
+    ]);
+
+  // =====================================================
+  // YEARLY EARNINGS
+  // =====================================================
+
+  const totalEarnings =
+    currentYearWorks.reduce(
+      (sum, work) =>
+        sum +
+        Number(
+          work.amount || 0
+        ),
+      0
+    );
+
+  // =====================================================
+  // YEARLY PAID
+  // =====================================================
+
+  const totalPaid =
+    currentYearWorks.reduce(
+      (sum, work) =>
+        sum +
+        Number(
+          work.paid || 0
+        ),
+      0
+    );
+
+  // =====================================================
+  // YEARLY PENDING
+  // =====================================================
+
+  const totalPending =
+    currentYearWorks.reduce(
+      (sum, work) => {
+        const amount =
+          Number(
+            work.amount || 0
+          );
+
+        const paid =
+          Number(
+            work.paid || 0
+          );
+
+        const due =
+          work.due !==
+            undefined &&
+          work.due !== null
+            ? Number(
+                work.due || 0
+              )
+            : amount - paid;
+
+        return sum + due;
+      },
+      0
+    );
+
+  // =====================================================
+  // ONLY FOUR VEHICLES
+  // =====================================================
+
+  const vehicleCards = [
+    "Tractor",
+    "JCB",
+    "Harvester",
+    "Car / EV",
+  ];
 
   return (
     <div className="min-h-screen bg-slate-50">
 
-      {/* =====================================================
-          MOBILE LEFT DRAWER
-      ====================================================== */}
-
-      {menuOpen && (
-        <div className="fixed inset-0 z-[100]">
-
-          <div
-            className="absolute inset-0 bg-black/50"
-            onClick={() => setMenuOpen(false)}
-          />
-
-          <aside className="absolute left-0 top-0 bottom-0 w-[290px] max-w-[85vw] bg-white shadow-2xl flex flex-col">
-
-            <div className="bg-green-700 text-white px-6 pt-8 pb-6">
-
-              <div className="flex items-center justify-between">
-
-                <div>
-                  <h1 className="text-2xl font-bold">
-                    WorkHistory
-                  </h1>
-
-                  <p className="text-sm text-green-100 mt-1">
-                    Owner Portal
-                  </p>
-                </div>
-
-                <button
-                  onClick={() => setMenuOpen(false)}
-                  className="w-10 h-10 rounded-full flex items-center justify-center text-2xl"
-                >
-                  ×
-                </button>
-
-              </div>
-
-              <div className="flex items-center gap-3 mt-7">
-
-                <div className="w-14 h-14 rounded-full bg-white text-green-700 flex items-center justify-center font-bold">
-                  VS
-                </div>
-
-                <div>
-                  <p className="text-lg font-semibold">
-                    Saikiran
-                  </p>
-
-                  <p className="text-sm text-green-100">
-                    Owner
-                  </p>
-                </div>
-
-              </div>
-
-            </div>
-
-            <nav className="flex-1 px-4 py-5 space-y-1 overflow-y-auto">
-
-              <DrawerItem
-                icon="⌂"
-                text="Dashboard"
-                active
-                onClick={() => goTo("/owner")}
-              />
-
-              <DrawerItem
-                icon="+"
-                text="Add Work"
-                onClick={() => goTo("/owner/add-work")}
-              />
-
-              <DrawerItem
-                icon="₹"
-                text="Payments"
-                onClick={() => goTo("/owner/payments")}
-              />
-
-              <DrawerItem
-                icon="▤"
-                text="Work History"
-                onClick={() => goTo("/owner/work-history")}
-              />
-
-              <DrawerItem
-                icon="♙"
-                text="Customers"
-                onClick={() => goTo("/owner/customers")}
-              />
-
-              <DrawerItem
-                icon="🚜"
-                text="Vehicle Types"
-                onClick={() => goTo("/owner/vehicles")}
-              />
-
-              <DrawerItem
-                icon="▥"
-                text="Profit History"
-                onClick={() => goTo("/owner/profit")}
-              />
-
-              <div className="border-t my-4" />
-
-              <DrawerItem
-                icon="♙"
-                text="Profile"
-                onClick={() => goTo("/owner/profile")}
-              />
-
-              <DrawerItem
-                icon="⚙"
-                text="Settings"
-                onClick={() => goTo("/owner/settings")}
-              />
-
-            </nav>
-
-            <div className="p-4 border-t">
-
-              <button
-                onClick={handleLogout}
-                className="w-full h-14 rounded-xl bg-red-50 text-red-600 flex items-center gap-4 px-5 font-semibold"
-              >
-                <span className="text-xl">
-                  ⇥
-                </span>
-
-                Logout
-              </button>
-
-            </div>
-
-          </aside>
-
-        </div>
-      )}
-
-
-      {/* =====================================================
+      {/* =================================================
           DESKTOP SIDEBAR
-      ====================================================== */}
+      ================================================= */}
 
-      <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 w-64 bg-white border-r z-40 flex-col">
+      <aside
+        className="
+          hidden
+          md:flex
+          fixed
+          left-0
+          top-0
+          bottom-0
+          w-64
+          bg-white
+          border-r
+          border-slate-200
+          flex-col
+        "
+      >
 
-        <div className="px-6 py-7 border-b">
+        <div className="p-6">
 
-          <h1 className="text-2xl font-bold text-green-700">
+          <h1 className="text-2xl font-bold text-green-600">
             WorkHistory
           </h1>
 
-          <p className="text-sm text-gray-400 mt-1">
+          <p className="text-sm text-slate-400 mt-1">
             Owner Portal
           </p>
 
         </div>
 
-        <nav className="flex-1 p-4 space-y-1">
-
-          <DrawerItem
-            icon="⌂"
-            text="Dashboard"
-            active
-            onClick={() => goTo("/owner")}
-          />
-
-          <DrawerItem
-            icon="+"
-            text="Add Work"
-            onClick={() => goTo("/owner/add-work")}
-          />
-
-          <DrawerItem
-            icon="₹"
-            text="Payments"
-            onClick={() => goTo("/owner/payments")}
-          />
-
-          <DrawerItem
-            icon="▤"
-            text="Work History"
-            onClick={() => goTo("/owner/work-history")}
-          />
-
-          <DrawerItem
-            icon="♙"
-            text="Customers"
-            onClick={() => goTo("/owner/customers")}
-          />
-
-          <DrawerItem
-            icon="🚜"
-            text="Vehicle Types"
-            onClick={() => goTo("/owner/vehicles")}
-          />
-
-          <DrawerItem
-            icon="▥"
-            text="Profit History"
-            onClick={() => goTo("/owner/profit")}
-          />
-
-          <DrawerItem
-            icon="♙"
-            text="Profile"
-            onClick={() => goTo("/owner/profile")}
-          />
-
-        </nav>
-
-        <div className="p-4 border-t">
+        <div className="px-5 py-4 border-b border-slate-200">
 
           <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-600 hover:bg-red-50"
+            onClick={() =>
+              navigate("/role")
+            }
+            className="
+              w-full
+              flex
+              items-center
+              gap-3
+              px-4
+              py-3
+              rounded-xl
+              bg-green-50
+              text-green-700
+              font-semibold
+              hover:bg-green-100
+            "
           >
-            <span className="text-xl">
-              ⇥
+
+            🔄
+
+            <span>
+              Change Role
             </span>
 
+          </button>
+
+        </div>
+
+        <div className="flex-1 p-5 space-y-2">
+
+          {/* DASHBOARD */}
+
+          <button
+            onClick={() =>
+              navigate("/owner")
+            }
+            className="
+              w-full
+              flex
+              items-center
+              gap-4
+              px-4
+              py-3
+              rounded-xl
+              bg-green-50
+              text-green-700
+              font-semibold
+            "
+          >
+
+            ⌂
+
+            Dashboard
+
+          </button>
+
+          {/* PAYMENTS */}
+
+          <button
+            onClick={() =>
+              navigate(
+                "/owner/payments"
+              )
+            }
+            className="
+              w-full
+              flex
+              items-center
+              gap-4
+              px-4
+              py-3
+              text-slate-700
+              hover:bg-slate-50
+              rounded-xl
+            "
+          >
+
+            ₹
+
+            Payments
+
+          </button>
+
+          {/* WORK HISTORY */}
+
+          <button
+            onClick={
+              openAllVehicles
+            }
+            className="
+              w-full
+              flex
+              items-center
+              gap-4
+              px-4
+              py-3
+              text-slate-700
+              hover:bg-slate-50
+              rounded-xl
+            "
+          >
+
+            ▤
+
+            Work History
+
+          </button>
+
+          {/* CUSTOMERS */}
+
+          <button
+            onClick={() =>
+              navigate(
+                "/owner/customers"
+              )
+            }
+            className="
+              w-full
+              flex
+              items-center
+              gap-4
+              px-4
+              py-3
+              text-slate-700
+              hover:bg-slate-50
+              rounded-xl
+            "
+          >
+
+            ♙
+
+            Customers
+
+          </button>
+
+          {/* VEHICLE TYPES */}
+
+          <button
+            className="
+              w-full
+              flex
+              items-center
+              gap-4
+              px-4
+              py-3
+              text-slate-700
+              hover:bg-slate-50
+              rounded-xl
+            "
+          >
+
+            🚜
+
+            Vehicle Types
+
+          </button>
+
+          {/* PROFIT HISTORY */}
+
+          <button
+            className="
+              w-full
+              flex
+              items-center
+              gap-4
+              px-4
+              py-3
+              text-slate-700
+              hover:bg-slate-50
+              rounded-xl
+            "
+          >
+
+            ▥
+
+            Profit History
+
+          </button>
+
+          {/* PROFILE */}
+
+          <button
+            className="
+              w-full
+              flex
+              items-center
+              gap-4
+              px-4
+              py-3
+              text-slate-700
+              hover:bg-slate-50
+              rounded-xl
+            "
+          >
+
+            ♙
+
+            Profile
+
+          </button>
+
+        </div>
+
+        {/* LOGOUT */}
+
+        <div className="border-t border-slate-200 p-5">
+
+          <button
+            onClick={() => {
+
+              localStorage.removeItem(
+                "JWT_TOKEN"
+              );
+
+              navigate("/login");
+
+            }}
+            className="
+              w-full
+              flex
+              items-center
+              gap-4
+              px-4
+              py-3
+              text-red-600
+              rounded-xl
+              hover:bg-red-50
+            "
+          >
+
+            →
+
             Logout
+
           </button>
 
         </div>
 
       </aside>
 
+      {/* =================================================
+          MAIN
+      ================================================= */}
 
-      {/* =====================================================
-          MAIN CONTENT
-      ====================================================== */}
-
-      <main className="lg:ml-64 min-h-screen pb-32">
+      <main
+        className="
+          md:ml-64
+          min-h-screen
+          pb-24
+        "
+      >
 
         {/* HEADER */}
 
-        <header className="sticky top-0 z-30 bg-green-700 text-white">
+        <header
+          className="
+            bg-green-700
+            text-white
+            px-4
+            py-3
+            md:px-8
+            md:py-4
+          "
+        >
 
-          <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="flex justify-between items-center">
 
-            <div className="h-[72px] flex items-center justify-between">
+            <div>
 
-              <div className="flex items-center gap-3">
+              <h1 className="text-lg md:text-2xl font-bold">
+                WorkHistory
+              </h1>
 
-                <button
-                  onClick={() => setMenuOpen(true)}
-                  className="w-11 h-11 rounded-full flex items-center justify-center text-2xl lg:hidden"
-                >
-                  ☰
-                </button>
+              <p className="text-xs md:text-sm">
+                Owner Dashboard
+              </p>
 
-                <div>
+            </div>
 
-                  <h1 className="text-xl sm:text-2xl font-bold">
-                    WorkHistory
-                  </h1>
+            <div
+              className="
+                w-9
+                h-9
+                rounded-full
+                bg-white
+                text-green-700
+                flex
+                items-center
+                justify-center
+                font-bold
+              "
+            >
 
-                  <p className="text-xs sm:text-sm text-green-100">
-                    Owner Dashboard
-                  </p>
-
-                </div>
-
-              </div>
-
-              <div className="flex items-center gap-3">
-
-                <button className="relative w-11 h-11 flex items-center justify-center text-xl">
-                  🔔
-
-                  <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-red-500 border-2 border-green-700" />
-                </button>
-
-                <button
-                  onClick={() => goTo("/owner/profile")}
-                  className="w-11 h-11 rounded-full bg-white text-green-700 flex items-center justify-center font-bold"
-                >
-                  VS
-                </button>
-
-              </div>
+              VS
 
             </div>
 
@@ -306,70 +764,94 @@ function OwnerDashboard() {
 
         </header>
 
+        <div
+          className="
+            max-w-5xl
+            mx-auto
+            px-3
+            md:px-8
+            py-4
+          "
+        >
 
-        {/* CONTENT */}
+          {/* =================================================
+              YEARLY EARNINGS
+          ================================================= */}
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+          <section
+            className="
+              bg-white
+              border
+              border-slate-200
+              rounded-2xl
+              p-4
+              shadow-sm
+            "
+          >
 
-          <section className="mb-6">
+            <div className="flex items-center justify-between">
 
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
-              Hello, Saikiran 👋
-            </h2>
+              <p className="text-xs text-slate-500">
+                Yearly Earnings
+              </p>
 
-            <p className="text-gray-500 mt-1">
-              Manage your work and payments
-            </p>
-
-          </section>
-
-
-          {/* EARNINGS */}
-
-          <section className="bg-white rounded-3xl border shadow-sm p-5 sm:p-7">
-
-            <div className="flex items-start justify-between">
-
-              <div>
-
-                <p className="text-sm text-gray-500">
-                  Total Earnings
-                </p>
-
-                <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mt-2">
-                  ₹12,500
-                </h2>
-
-              </div>
-
-              <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center text-2xl">
-                📊
-              </div>
+              <span className="text-xs font-semibold text-green-600">
+                {currentYear}
+              </span>
 
             </div>
 
-            <div className="border-t mt-6 pt-5 grid grid-cols-2">
+            <h2 className="text-3xl font-bold text-slate-900 mt-1">
+
+              {formatMoney(
+                totalEarnings
+              )}
+
+            </h2>
+
+            <div
+              className="
+                mt-4
+                grid
+                grid-cols-2
+                gap-4
+              "
+            >
 
               <div>
 
-                <p className="text-sm text-gray-500">
+                <p className="text-xs text-slate-500">
                   Paid
                 </p>
 
-                <p className="text-xl font-bold text-green-600 mt-1">
-                  ₹9,000
+                <p className="text-lg font-bold text-green-600">
+
+                  {formatMoney(
+                    totalPaid
+                  )}
+
                 </p>
 
               </div>
 
-              <div className="border-l pl-5">
+              <div
+                className="
+                  border-l
+                  border-slate-200
+                  pl-4
+                "
+              >
 
-                <p className="text-sm text-gray-500">
+                <p className="text-xs text-slate-500">
                   Pending
                 </p>
 
-                <p className="text-xl font-bold text-orange-500 mt-1">
-                  ₹3,500
+                <p className="text-lg font-bold text-orange-500">
+
+                  {formatMoney(
+                    totalPending
+                  )}
+
                 </p>
 
               </div>
@@ -378,158 +860,586 @@ function OwnerDashboard() {
 
           </section>
 
+          {/* =================================================
+              QUICK ACTIONS
+          ================================================= */}
 
-          {/* QUICK ACTIONS */}
+          <section className="mt-6">
 
-          <section className="mt-8">
+            <div className="flex justify-between items-center mb-3">
 
-            <div className="flex items-center justify-between mb-4">
-
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
+              <h2 className="text-xl font-bold">
                 Quick Actions
               </h2>
 
-              <button className="text-green-600 text-sm font-semibold">
-                See all →
-              </button>
-
             </div>
 
-            <div className="grid grid-cols-4 gap-2 sm:gap-5">
+            <div
+              className="
+                grid
+                grid-cols-4
+                gap-2
+              "
+            >
 
-              <QuickAction
-                icon="+"
-                title="Add Work"
-                bg="bg-green-100"
-                color="text-green-600"
-                onClick={() => goTo("/owner/add-work")}
-              />
+              {/* PAYMENTS */}
 
-              <QuickAction
-                icon="₹"
-                title="Payments"
-                bg="bg-blue-100"
-                color="text-blue-600"
-                onClick={() => goTo("/owner/payments")}
-              />
+              <button
+                onClick={() =>
+                  navigate(
+                    "/owner/payments"
+                  )
+                }
+                className="
+                  bg-white
+                  border
+                  border-slate-200
+                  rounded-xl
+                  p-2
+                  text-center
+                  active:scale-95
+                "
+              >
 
-              <QuickAction
-                icon="▤"
-                title="History"
-                bg="bg-purple-100"
-                color="text-purple-600"
-                onClick={() => goTo("/owner/work-history")}
-              />
+                <div
+                  className="
+                    w-10
+                    h-10
+                    mx-auto
+                    rounded-xl
+                    bg-blue-100
+                    flex
+                    items-center
+                    justify-center
+                    text-xl
+                  "
+                >
 
-              <QuickAction
-                icon="♙"
-                title="Customers"
-                bg="bg-orange-100"
-                color="text-orange-600"
-                onClick={() => goTo("/owner/customers")}
-              />
+                  ₹
+
+                </div>
+
+                <p className="text-xs mt-1">
+                  Payments
+                </p>
+
+              </button>
+
+              {/* HISTORY */}
+
+              <button
+                onClick={
+                  openAllVehicles
+                }
+                className="
+                  bg-white
+                  border
+                  border-slate-200
+                  rounded-xl
+                  p-2
+                  text-center
+                  active:scale-95
+                "
+              >
+
+                <div
+                  className="
+                    w-10
+                    h-10
+                    mx-auto
+                    rounded-xl
+                    bg-purple-100
+                    flex
+                    items-center
+                    justify-center
+                    text-xl
+                  "
+                >
+
+                  ▤
+
+                </div>
+
+                <p className="text-xs mt-1">
+                  History
+                </p>
+
+              </button>
+
+              {/* CUSTOMERS */}
+
+              <button
+                onClick={() =>
+                  navigate(
+                    "/owner/customers"
+                  )
+                }
+                className="
+                  bg-white
+                  border
+                  border-slate-200
+                  rounded-xl
+                  p-2
+                  text-center
+                  active:scale-95
+                "
+              >
+
+                <div
+                  className="
+                    w-10
+                    h-10
+                    mx-auto
+                    rounded-xl
+                    bg-orange-100
+                    flex
+                    items-center
+                    justify-center
+                    text-xl
+                  "
+                >
+
+                  ♙
+
+                </div>
+
+                <p className="text-xs mt-1">
+                  Customers
+                </p>
+
+              </button>
+
+              {/* PROFILE */}
+
+              <button
+                className="
+                  bg-white
+                  border
+                  border-slate-200
+                  rounded-xl
+                  p-2
+                  text-center
+                  active:scale-95
+                "
+              >
+
+                <div
+                  className="
+                    w-10
+                    h-10
+                    mx-auto
+                    rounded-xl
+                    bg-green-100
+                    flex
+                    items-center
+                    justify-center
+                    text-xl
+                  "
+                >
+
+                  ♙
+
+                </div>
+
+                <p className="text-xs mt-1">
+                  Profile
+                </p>
+
+              </button>
 
             </div>
 
           </section>
 
+          {/* =================================================
+              WORK BY VEHICLE
+          ================================================= */}
 
-          {/* VEHICLES */}
+          <section className="mt-6">
 
-          <section className="mt-8">
+            <div className="flex justify-between items-center mb-3">
 
-            <div className="flex items-center justify-between mb-4">
-
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
+              <h2 className="text-xl font-bold">
                 Work by Vehicle
               </h2>
 
-              <button className="text-sm text-gray-500">
-                This month ▼
+              <button
+                onClick={
+                  openAllVehicles
+                }
+                className="
+                  text-sm
+                  text-green-600
+                  font-semibold
+                  active:scale-95
+                "
+              >
+
+                See all →
+
               </button>
 
             </div>
 
-            <div className="grid grid-cols-2 gap-3 sm:gap-5">
+            <div
+              className="
+                grid
+                grid-cols-2
+                gap-2
+              "
+            >
 
-              <VehicleCard
-                icon="🚜"
-                name="Tractor"
-                amount="₹5,000"
-              />
+              {vehicleCards.map(
+                (vehicle) => (
 
-              <VehicleCard
-                icon="🏗️"
-                name="JCB"
-                amount="₹3,500"
-              />
+                  <button
+                    key={vehicle}
+                    type="button"
+                    onClick={() =>
+                      openVehicleHistory(
+                        vehicle
+                      )
+                    }
+                    className="
+                      w-full
+                      bg-white
+                      border
+                      border-slate-200
+                      rounded-xl
+                      p-3
+                      flex
+                      items-center
+                      justify-between
+                      text-left
+                      active:scale-[0.98]
+                      hover:border-green-400
+                      hover:shadow-sm
+                      transition
+                    "
+                  >
 
-              <VehicleCard
-                icon="🌾"
-                name="Harvester"
-                amount="₹2,000"
-              />
+                    <div
+                      className="
+                        flex
+                        items-center
+                        gap-2
+                      "
+                    >
 
-              <VehicleCard
-                icon="🚐"
-                name="Others"
-                amount="₹2,000"
-              />
+                      <div
+                        className="
+                          w-10
+                          h-10
+                          rounded-full
+                          bg-green-50
+                          flex
+                          items-center
+                          justify-center
+                          text-xl
+                        "
+                      >
+
+                        {getVehicleIcon(
+                          vehicle
+                        )}
+
+                      </div>
+
+                      <div>
+
+                        <p className="text-sm font-bold">
+                          {vehicle}
+                        </p>
+
+                        <p className="text-sm font-bold">
+
+                          {formatMoney(
+                            vehicleTotals[
+                              vehicle
+                            ] || 0
+                          )}
+
+                        </p>
+
+                      </div>
+
+                    </div>
+
+                    <span
+                      className="
+                        text-green-600
+                        text-xl
+                        font-bold
+                      "
+                    >
+
+                      →
+
+                    </span>
+
+                  </button>
+
+                )
+              )}
 
             </div>
 
           </section>
 
+          {/* =================================================
+              RECENT WORK
+          ================================================= */}
 
-          {/* RECENT WORK */}
+          <section className="mt-6">
 
-          <section className="mt-8">
+            <div
+              className="
+                flex
+                items-center
+                justify-between
+                mb-3
+              "
+            >
 
-            <div className="flex items-center justify-between mb-4">
-
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
+              <h2 className="text-xl font-bold">
                 Recent Work
               </h2>
 
               <button
-                onClick={() => goTo("/owner/work-history")}
-                className="text-green-600 text-sm font-semibold"
+                type="button"
+                onClick={
+                  openRecentWorkHistory
+                }
+                className="
+                  text-green-600
+                  font-semibold
+                  text-sm
+                  active:scale-95
+                "
               >
+
                 See all →
+
               </button>
 
             </div>
 
-            <div className="space-y-3">
+            {loading && (
 
-              <WorkCard
-                name="Ramesh"
-                vehicle="Tractor"
-                work="Ploughing"
-                date="12 Sep 2026"
-                amount="₹2,500"
-                status="Paid"
-              />
+              <div
+                className="
+                  bg-white
+                  border
+                  border-slate-200
+                  rounded-xl
+                  p-5
+                  text-center
+                  text-sm
+                  text-slate-500
+                "
+              >
 
-              <WorkCard
-                name="Suresh"
-                vehicle="JCB"
-                work="Land Work"
-                date="10 Sep 2026"
-                amount="₹3,000"
-                status="Due ₹1,000"
-              />
+                Loading recent work...
 
-              <WorkCard
-                name="Mahesh"
-                vehicle="Harvester"
-                work="Harvesting"
-                date="8 Sep 2026"
-                amount="₹4,000"
-                status="Paid"
-              />
+              </div>
 
-            </div>
+            )}
+
+            {!loading &&
+              recentWorks.length ===
+                0 && (
+
+                <div
+                  className="
+                    bg-white
+                    border
+                    border-slate-200
+                    rounded-xl
+                    p-5
+                    text-center
+                  "
+                >
+
+                  <p className="text-2xl">
+                    📋
+                  </p>
+
+                  <p className="text-sm font-semibold mt-2">
+                    No work records yet
+                  </p>
+
+                  <p className="text-xs text-slate-500 mt-1">
+                    Add your first work
+                    record.
+                  </p>
+
+                </div>
+
+              )}
+
+            {!loading &&
+              recentWorks.length >
+                0 && (
+
+                <div className="space-y-2.5">
+
+                  {recentWorks.map(
+                    (
+                      work,
+                      index
+                    ) => {
+
+                      const vehicle =
+                        formatVehicle(
+                          work.machine
+                        );
+
+                      return (
+
+                        <div
+                          key={
+                            work.id ||
+                            work.Id ||
+                            index
+                          }
+                          className="
+                            bg-white
+                            border
+                            border-slate-200
+                            rounded-2xl
+                            px-3
+                            py-3
+                            shadow-sm
+                          "
+                        >
+
+                          <div
+                            className="
+                              flex
+                              items-center
+                              justify-between
+                              gap-2
+                            "
+                          >
+
+                            <div
+                              className="
+                                flex
+                                items-center
+                                gap-3
+                                min-w-0
+                              "
+                            >
+
+                              <div
+                                className="
+                                  w-11
+                                  h-11
+                                  rounded-full
+                                  bg-green-50
+                                  flex
+                                  items-center
+                                  justify-center
+                                  text-2xl
+                                  shrink-0
+                                "
+                              >
+
+                                {getVehicleIcon(
+                                  work.machine
+                                )}
+
+                              </div>
+
+                              <div className="min-w-0">
+
+                                <p
+                                  className="
+                                    text-sm
+                                    font-bold
+                                    text-slate-900
+                                    truncate
+                                  "
+                                >
+
+                                  {work.customerName ||
+                                    "Customer"}
+
+                                </p>
+
+                                <p
+                                  className="
+                                    text-xs
+                                    text-slate-500
+                                    mt-0.5
+                                    truncate
+                                  "
+                                >
+
+                                  {vehicle}
+
+                                  <span className="mx-1">
+                                    •
+                                  </span>
+
+                                  {work.workType ||
+                                    "Work"}
+
+                                </p>
+
+                              </div>
+
+                            </div>
+
+                            <div
+                              className="
+                                text-right
+                                shrink-0
+                              "
+                            >
+
+                              <p
+                                className="
+                                  text-sm
+                                  font-bold
+                                  text-slate-900
+                                "
+                              >
+
+                                {formatMoney(
+                                  work.amount
+                                )}
+
+                              </p>
+
+                              <p
+                                className="
+                                  text-[10px]
+                                  text-slate-400
+                                  mt-0.5
+                                "
+                              >
+
+                                {formatDate(
+                                  work.date
+                                )}
+
+                              </p>
+
+                            </div>
+
+                          </div>
+
+                        </div>
+
+                      );
+
+                    }
+                  )}
+
+                </div>
+
+              )}
 
           </section>
 
@@ -537,311 +1447,151 @@ function OwnerDashboard() {
 
       </main>
 
+      {/* =================================================
+          MOBILE BOTTOM NAV
+      ================================================= */}
 
-      {/* =====================================================
-          FIXED ADD WORK BUTTON
-          THIS IS ALWAYS AT BOTTOM CENTER
-      ====================================================== */}
-
-      <button
-        type="button"
-        onClick={() => goTo("/owner/add-work")}
+      <div
         className="
+          md:hidden
           fixed
-          left-1/2
-          -translate-x-1/2
-          bottom-5
-          z-[120]
+          bottom-0
+          left-0
+          right-0
+          h-16
+          bg-white
+          border-t
+          border-slate-200
           flex
-          flex-col
           items-center
+          justify-around
+          z-50
         "
       >
 
-        <div className="
-          w-[68px]
-          h-[68px]
-          rounded-full
-          bg-green-600
-          border-[5px]
-          border-white
-          shadow-xl
-          flex
-          items-center
-          justify-center
-          text-white
-          text-4xl
-          font-light
-        ">
+        {/* HOME */}
+
+        <button
+          onClick={() =>
+            navigate("/owner")
+          }
+          className="
+            flex
+            flex-col
+            items-center
+            text-green-600
+            text-[10px]
+          "
+        >
+
+          <span className="text-lg">
+            ⌂
+          </span>
+
+          Home
+
+        </button>
+
+        {/* HISTORY */}
+
+        <button
+          onClick={
+            openAllVehicles
+          }
+          className="
+            flex
+            flex-col
+            items-center
+            text-slate-500
+            text-[10px]
+          "
+        >
+
+          <span className="text-lg">
+            ▤
+          </span>
+
+          History
+
+        </button>
+
+        {/* ADD */}
+
+        <button
+          onClick={() =>
+            navigate(
+              "/owner/add-work"
+            )
+          }
+          className="
+            -mt-8
+            w-14
+            h-14
+            rounded-full
+            bg-green-600
+            text-white
+            text-3xl
+            shadow-lg
+            border-4
+            border-white
+            flex
+            items-center
+            justify-center
+          "
+        >
+
           +
-        </div>
 
-        <span className="
-          mt-1
-          text-xs
-          font-bold
-          text-gray-700
-          bg-white
-          px-2
-          rounded
-        ">
-          Add Work
-        </span>
+        </button>
 
-      </button>
+        {/* CUSTOMERS */}
 
+        <button
+          onClick={() =>
+            navigate(
+              "/owner/customers"
+            )
+          }
+          className="
+            flex
+            flex-col
+            items-center
+            text-slate-500
+            text-[10px]
+          "
+        >
 
-      {/* =====================================================
-          MOBILE BOTTOM NAVIGATION
-      ====================================================== */}
+          <span className="text-lg">
+            ♙
+          </span>
 
-      <div className="
-        lg:hidden
-        fixed
-        left-0
-        right-0
-        bottom-0
-        z-[100]
-        h-[82px]
-        bg-white
-        border-t
-        border-gray-200
-        shadow-[0_-4px_20px_rgba(0,0,0,0.08)]
-      ">
+          Customers
 
-        <div className="grid grid-cols-5 h-full">
+        </button>
 
-          <BottomNav
-            icon="⌂"
-            text="Home"
-            active
-            onClick={() => goTo("/owner")}
-          />
+        {/* PROFILE */}
 
-          <BottomNav
-            icon="▤"
-            text="History"
-            onClick={() => goTo("/owner/work-history")}
-          />
+        <button
+          className="
+            flex
+            flex-col
+            items-center
+            text-slate-500
+            text-[10px]
+          "
+        >
 
-          <div />
+          <span className="text-lg">
+            ♙
+          </span>
 
-          <BottomNav
-            icon="♙"
-            text="Customers"
-            onClick={() => goTo("/owner/customers")}
-          />
+          Profile
 
-          <BottomNav
-            icon="♙"
-            text="Profile"
-            onClick={() => goTo("/owner/profile")}
-          />
-
-        </div>
+        </button>
 
       </div>
 
     </div>
-  );
-}
-
-
-/* =========================================================
-   DRAWER ITEM
-========================================================= */
-
-function DrawerItem({
-  icon,
-  text,
-  active = false,
-  onClick,
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-xl text-left ${
-        active
-          ? "bg-green-100 text-green-700 font-semibold"
-          : "text-gray-700 hover:bg-gray-100"
-      }`}
-    >
-
-      <span className="w-7 text-center text-xl">
-        {icon}
-      </span>
-
-      <span>
-        {text}
-      </span>
-
-    </button>
-  );
-}
-
-
-/* =========================================================
-   QUICK ACTION
-========================================================= */
-
-function QuickAction({
-  icon,
-  title,
-  bg,
-  color,
-  onClick,
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="flex flex-col items-center"
-    >
-
-      <div
-        className={`w-full aspect-square max-w-[100px] rounded-2xl ${bg} ${color} flex items-center justify-center text-4xl`}
-      >
-        {icon}
-      </div>
-
-      <p className="text-xs sm:text-sm font-medium text-gray-700 mt-2">
-        {title}
-      </p>
-
-    </button>
-  );
-}
-
-
-/* =========================================================
-   VEHICLE CARD
-========================================================= */
-
-function VehicleCard({
-  icon,
-  name,
-  amount,
-}) {
-  return (
-    <button className="bg-white border rounded-2xl p-4 flex items-center justify-between shadow-sm text-left">
-
-      <div className="flex items-center gap-3">
-
-        <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center text-2xl">
-          {icon}
-        </div>
-
-        <div>
-
-          <p className="font-semibold text-gray-800">
-            {name}
-          </p>
-
-          <p className="font-bold text-gray-900 mt-1">
-            {amount}
-          </p>
-
-        </div>
-
-      </div>
-
-      <span className="text-green-600 text-2xl">
-        ›
-      </span>
-
-    </button>
-  );
-}
-
-
-/* =========================================================
-   WORK CARD
-========================================================= */
-
-function WorkCard({
-  name,
-  vehicle,
-  work,
-  date,
-  amount,
-  status,
-}) {
-  const paid = status === "Paid";
-
-  return (
-    <button className="w-full bg-white border rounded-2xl p-4 shadow-sm flex items-center gap-3 text-left">
-
-      <div className="w-11 h-11 rounded-full bg-slate-100 flex items-center justify-center text-xl shrink-0">
-        👤
-      </div>
-
-      <div className="flex-1 min-w-0">
-
-        <p className="font-bold text-gray-900">
-          {name}
-        </p>
-
-        <p className="text-sm text-gray-500 truncate">
-          {vehicle} • {work}
-        </p>
-
-        <p className="text-xs text-gray-400 mt-1">
-          {date}
-        </p>
-
-      </div>
-
-      <div className="text-right shrink-0">
-
-        <p className="font-bold text-gray-900">
-          {amount}
-        </p>
-
-        <span
-          className={`inline-block text-xs font-semibold px-2.5 py-1 rounded-full mt-1 ${
-            paid
-              ? "bg-green-100 text-green-700"
-              : "bg-orange-100 text-orange-600"
-          }`}
-        >
-          {status}
-        </span>
-
-      </div>
-
-    </button>
-  );
-}
-
-
-/* =========================================================
-   BOTTOM NAV ITEM
-========================================================= */
-
-function BottomNav({
-  icon,
-  text,
-  active = false,
-  onClick,
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex flex-col items-center justify-center gap-1 ${
-        active
-          ? "text-green-600"
-          : "text-gray-500"
-      }`}
-    >
-
-      <span className="text-2xl">
-        {icon}
-      </span>
-
-      <span className={`text-[11px] ${active ? "font-bold" : ""}`}>
-        {text}
-      </span>
-
-    </button>
   );
 }
 
