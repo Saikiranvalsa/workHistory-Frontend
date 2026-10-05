@@ -13,7 +13,10 @@ import OwnerCustomers from "./pages/owner/OwnerCustomers";
 import CustomerDetails from "./pages/owner/CustomerDetails";
 import CustomerWorkHistory from "./pages/owner/CustomerWorkHistory";
 import CustomerDashboard from "./pages/customer/CustomerDashboard";
+import OwnerDrivers from "./pages/owner/OwnerDrivers";
 import Profile from "./pages/Profile";
+import DriverHistory from "./pages/owner/DriverHistory";
+import DriverAttendance from "./pages/owner/DriverAttendance";
 function App() {
   return (
     <BrowserRouter>
@@ -91,6 +94,18 @@ function App() {
           element={<CustomerDashboard />}
         />
         <Route path="/profile" element={<Profile />} />
+        <Route
+          path="/owner/drivers"
+          element={<OwnerDrivers />}
+        />
+        <Route
+          path="/owner/driver-attendance"
+          element={<DriverAttendance />}
+        />
+        <Route
+          path="/owner/driver-history"
+          element={<DriverHistory />}
+        />
 
         
 

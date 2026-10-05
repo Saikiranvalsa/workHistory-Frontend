@@ -3,7 +3,6 @@ import {
   useLocation,
   useNavigate,
 } from "react-router-dom";
-
 import api from "../../services/api";
 
 function AddWorkDetails() {
@@ -41,7 +40,20 @@ function AddWorkDetails() {
     amount: "",
 
     paid: "",
+
+    driverName: "",
+    driverNumber: "",
   });
+
+  // =====================================================
+  // USER / OWNER PROFILE
+  // =====================================================
+
+  const [userProfile, setUserProfile] =
+    useState(null);
+
+  const [loadingProfile, setLoadingProfile] =
+    useState(false);
 
   // =====================================================
   // CUSTOMERS
@@ -60,7 +72,7 @@ function AddWorkDetails() {
     useState(false);
 
   // =====================================================
-  // OTP
+  // CUSTOMER OTP
   // =====================================================
 
   const [otp, setOtp] =
@@ -75,6 +87,48 @@ function AddWorkDetails() {
   const [otpVerified, setOtpVerified] =
     useState(!isNewCustomer);
 
+  const [customerMessage, setCustomerMessage] =
+    useState("");
+
+  // =====================================================
+  // DRIVERS
+  // =====================================================
+
+  const [drivers, setDrivers] =
+    useState([]);
+
+  /*
+    Values:
+    none = No Driver
+    self = I am the Driver
+    new  = Add New Driver
+    number = existing driver index
+  */
+  const [driverSelection, setDriverSelection] =
+    useState("none");
+
+  const [driverChecking, setDriverChecking] =
+    useState(false);
+
+  // =====================================================
+  // DRIVER OTP
+  // =====================================================
+
+  const [driverOtp, setDriverOtp] =
+    useState("");
+
+  const [driverGeneratedOtp, setDriverGeneratedOtp] =
+    useState("");
+
+  const [driverOtpSent, setDriverOtpSent] =
+    useState(false);
+
+  const [driverOtpVerified, setDriverOtpVerified] =
+    useState(false);
+
+  const [driverMessage, setDriverMessage] =
+    useState("");
+
   // =====================================================
   // OTHER STATES
   // =====================================================
@@ -85,16 +139,48 @@ function AddWorkDetails() {
   const [error, setError] =
     useState("");
 
-  const [message, setMessage] =
-    useState("");
+  // =====================================================
+  // LOAD DATA
+  // =====================================================
+
+  useEffect(() => {
+    loadProfile();
+    loadCustomers();
+    loadDrivers();
+  }, []);
+
+  // =====================================================
+  // LOAD LOGGED-IN USER
+  // =====================================================
+
+  const loadProfile = async () => {
+    try {
+      setLoadingProfile(true);
+
+      const response =
+        await api.get("/profile");
+
+      console.log(
+        "LOGGED-IN USER:",
+        response.data
+      );
+
+      setUserProfile(response.data);
+    } catch (err) {
+      console.error(
+        "PROFILE LOAD ERROR:",
+        err
+      );
+
+      setUserProfile(null);
+    } finally {
+      setLoadingProfile(false);
+    }
+  };
 
   // =====================================================
   // LOAD CUSTOMERS
   // =====================================================
-
-  useEffect(() => {
-    loadCustomers();
-  }, []);
 
   const loadCustomers = async () => {
     try {
@@ -122,7 +208,92 @@ function AddWorkDetails() {
   };
 
   // =====================================================
-  // NORMALIZE PHONE NUMBER
+  // LOAD DRIVERS
+  //
+  // Drivers are collected from previous works.
+  // =====================================================
+
+  const loadDrivers = async () => {
+    try {
+      setDriverChecking(true);
+
+      const response =
+        await api.get(
+          "/owner/works"
+        );
+
+      console.log(
+        "OWNER WORKS FOR DRIVERS:",
+        response.data
+      );
+
+      const works =
+        Array.isArray(response.data)
+          ? response.data
+          : [];
+
+      const uniqueDrivers = [];
+
+      works.forEach((work) => {
+        const name =
+          work.driverName
+            ?.toString()
+            .trim() || "";
+
+        const number =
+          work.driverNumber
+            ?.toString()
+            .trim() || "";
+
+        if (!name && !number) {
+          return;
+        }
+
+        const exists =
+          uniqueDrivers.some(
+            (driver) =>
+              normalizeNumber(
+                driver.number
+              ) ===
+                normalizeNumber(
+                  number
+                ) &&
+              driver.name
+                .toLowerCase()
+                .trim() ===
+                name
+                  .toLowerCase()
+                  .trim()
+          );
+
+        if (!exists) {
+          uniqueDrivers.push({
+            name,
+            number,
+          });
+        }
+      });
+
+      setDrivers(
+        uniqueDrivers
+      );
+
+      console.log(
+        "MY DRIVERS:",
+        uniqueDrivers
+      );
+    } catch (err) {
+      console.error(
+        "DRIVER LOAD ERROR:",
+        err
+      );
+    } finally {
+      setDriverChecking(false);
+    }
+  };
+
+  // =====================================================
+  // NORMALIZE NUMBER
   // =====================================================
 
   const normalizeNumber = (
@@ -134,7 +305,7 @@ function AddWorkDetails() {
   };
 
   // =====================================================
-  // FIND EXISTING CUSTOMER
+  // FIND CUSTOMER
   // =====================================================
 
   const findExistingCustomer = (
@@ -151,23 +322,16 @@ function AddWorkDetails() {
 
     return (
       customers.find(
-        (customer) => {
-          const existingNumber =
-            normalizeNumber(
-              customer.number
-            );
-
-          return (
-            existingNumber ===
-            cleanNumber
-          );
-        }
+        (customer) =>
+          normalizeNumber(
+            customer.number
+          ) === cleanNumber
       ) || null
     );
   };
 
   // =====================================================
-  // CHECK CUSTOMER AFTER LIST LOADS
+  // CHECK CUSTOMER AFTER LOAD
   // =====================================================
 
   useEffect(() => {
@@ -194,11 +358,6 @@ function AddWorkDetails() {
       );
 
     if (foundCustomer) {
-      console.log(
-        "EXISTING CUSTOMER:",
-        foundCustomer
-      );
-
       setFormData((prev) => ({
         ...prev,
         customerName:
@@ -206,16 +365,11 @@ function AddWorkDetails() {
       }));
 
       setCustomerExists(true);
-
-      // Existing customer does not need OTP
       setOtpVerified(true);
 
       setOtpSent(false);
       setGeneratedOtp("");
       setOtp("");
-
-      // Prevent duplicate message
-      setMessage("");
     }
   }, [
     customers,
@@ -224,7 +378,7 @@ function AddWorkDetails() {
   ]);
 
   // =====================================================
-  // NORMAL INPUT CHANGE
+  // NORMAL INPUT
   // =====================================================
 
   const handleChange = (e) => {
@@ -242,7 +396,7 @@ function AddWorkDetails() {
   };
 
   // =====================================================
-  // CUSTOMER NUMBER CHANGE
+  // CUSTOMER NUMBER
   // =====================================================
 
   const handleCustomerNumberChange = (
@@ -259,13 +413,12 @@ function AddWorkDetails() {
     }));
 
     setError("");
-    setMessage("");
+    setCustomerMessage("");
 
     if (!isNewCustomer) {
       return;
     }
 
-    // Reset previous customer / OTP status
     setOtpSent(false);
     setGeneratedOtp("");
     setOtp("");
@@ -283,21 +436,7 @@ function AddWorkDetails() {
     const foundCustomer =
       findExistingCustomer(value);
 
-    console.log(
-      "CHECKING NUMBER:",
-      value
-    );
-
-    console.log(
-      "FOUND CUSTOMER:",
-      foundCustomer
-    );
-
     if (foundCustomer) {
-      // =================================================
-      // EXISTING CUSTOMER
-      // =================================================
-
       setFormData((prev) => ({
         ...prev,
         customerNumber: value,
@@ -306,38 +445,27 @@ function AddWorkDetails() {
       }));
 
       setCustomerExists(true);
-
-      // Existing customer = no OTP
       setOtpVerified(true);
 
       setOtpSent(false);
       setGeneratedOtp("");
       setOtp("");
-
-      setMessage("");
-
     } else {
-      // =================================================
-      // NEW CUSTOMER
-      // =================================================
-
       setCustomerExists(false);
       setOtpVerified(false);
-      setMessage("");
     }
 
     setCheckingCustomer(false);
   };
 
   // =====================================================
-  // SEND OTP
+  // SEND CUSTOMER OTP
   // =====================================================
 
   const handleSendOtp = () => {
     setError("");
-    setMessage("");
+    setCustomerMessage("");
 
-    // Existing customer never needs OTP
     if (customerExists) {
       setOtpVerified(true);
       return;
@@ -353,15 +481,6 @@ function AddWorkDetails() {
     }
 
     if (
-      !formData.customerNumber.trim()
-    ) {
-      setError(
-        "Please enter customer mobile number."
-      );
-      return;
-    }
-
-    if (
       !/^[6-9]\d{9}$/.test(
         formData.customerNumber
       )
@@ -372,7 +491,6 @@ function AddWorkDetails() {
       return;
     }
 
-    // Development OTP
     const newOtp =
       Math.floor(
         100000 +
@@ -390,18 +508,17 @@ function AddWorkDetails() {
       newOtp
     );
 
-    setMessage(
+    setCustomerMessage(
       `Development OTP: ${newOtp}`
     );
   };
 
   // =====================================================
-  // VERIFY OTP
+  // VERIFY CUSTOMER OTP
   // =====================================================
 
   const handleVerifyOtp = () => {
     setError("");
-    setMessage("");
 
     if (!otp) {
       setError(
@@ -422,8 +539,306 @@ function AddWorkDetails() {
     setOtpVerified(true);
     setOtpSent(false);
 
-    setMessage(
+    setCustomerMessage(
       "Mobile number verified successfully."
+    );
+  };
+
+  // =====================================================
+  // DRIVER SELECTION
+  // =====================================================
+
+  const handleDriverSelection = (
+    e
+  ) => {
+    const value =
+      e.target.value;
+
+    setError("");
+    setDriverMessage("");
+
+    // =================================================
+    // NO DRIVER
+    // =================================================
+
+    if (value === "none") {
+      setDriverSelection("none");
+
+      setFormData((prev) => ({
+        ...prev,
+        driverName: "",
+        driverNumber: "",
+      }));
+
+      setDriverOtp("");
+      setDriverGeneratedOtp("");
+      setDriverOtpSent(false);
+      setDriverOtpVerified(false);
+
+      return;
+    }
+
+    // =================================================
+    // I AM THE DRIVER
+    // =================================================
+
+    if (value === "self") {
+      setDriverSelection("self");
+
+      if (
+        userProfile?.name &&
+        userProfile?.number
+      ) {
+        setFormData((prev) => ({
+          ...prev,
+          driverName:
+            userProfile.name,
+          driverNumber:
+            userProfile.number,
+        }));
+
+        setDriverOtpVerified(true);
+        setDriverOtpSent(false);
+        setDriverOtp("");
+        setDriverGeneratedOtp("");
+
+        setDriverMessage(
+          "✓ Your profile details will be used as the driver."
+        );
+      } else {
+        setFormData((prev) => ({
+          ...prev,
+          driverName: "",
+          driverNumber: "",
+        }));
+
+        setDriverOtpVerified(false);
+
+        setDriverMessage(
+          "Your profile details could not be loaded."
+        );
+      }
+
+      return;
+    }
+
+    // =================================================
+    // ADD NEW DRIVER
+    // =================================================
+
+    if (value === "new") {
+      setDriverSelection("new");
+
+      setFormData((prev) => ({
+        ...prev,
+        driverName: "",
+        driverNumber: "",
+      }));
+
+      setDriverOtp("");
+      setDriverGeneratedOtp("");
+      setDriverOtpSent(false);
+      setDriverOtpVerified(false);
+
+      return;
+    }
+
+    // =================================================
+    // EXISTING DRIVER
+    // =================================================
+
+    const driverIndex =
+      Number(value);
+
+    const selectedDriver =
+      drivers[driverIndex];
+
+    if (!selectedDriver) {
+      return;
+    }
+
+    setDriverSelection(value);
+
+    setFormData((prev) => ({
+      ...prev,
+      driverName:
+        selectedDriver.name || "",
+      driverNumber:
+        selectedDriver.number || "",
+    }));
+
+    setDriverOtpVerified(true);
+    setDriverOtpSent(false);
+    setDriverOtp("");
+    setDriverGeneratedOtp("");
+
+    setDriverMessage(
+      "✓ Existing driver selected. OTP is not required."
+    );
+  };
+
+  // =====================================================
+  // DRIVER NAME CHANGE
+  // =====================================================
+
+  const handleDriverNameChange = (
+    e
+  ) => {
+    setFormData((prev) => ({
+      ...prev,
+      driverName:
+        e.target.value,
+    }));
+
+    setDriverOtpVerified(false);
+    setError("");
+  };
+
+  // =====================================================
+  // DRIVER NUMBER CHANGE
+  // =====================================================
+
+  const handleDriverNumberChange = (
+    e
+  ) => {
+    const value =
+      e.target.value
+        .replace(/\D/g, "")
+        .slice(0, 10);
+
+    setFormData((prev) => ({
+      ...prev,
+      driverNumber: value,
+    }));
+
+    setDriverOtpVerified(false);
+    setDriverOtpSent(false);
+    setDriverOtp("");
+    setDriverGeneratedOtp("");
+
+    setError("");
+  };
+
+  // =====================================================
+  // SEND DRIVER OTP
+  // =====================================================
+
+  const handleSendDriverOtp = () => {
+    setError("");
+    setDriverMessage("");
+
+    if (
+      !formData.driverName.trim()
+    ) {
+      setError(
+        "Please enter driver name."
+      );
+      return;
+    }
+
+    if (
+      !/^[6-9]\d{9}$/.test(
+        formData.driverNumber
+      )
+    ) {
+      setError(
+        "Please enter a valid 10-digit driver mobile number."
+      );
+      return;
+    }
+
+    // =================================================
+    // CHECK EXISTING DRIVER
+    // =================================================
+
+    const existingDriver =
+      drivers.find(
+        (driver) =>
+          normalizeNumber(
+            driver.number
+          ) ===
+          normalizeNumber(
+            formData.driverNumber
+          )
+      );
+
+    if (existingDriver) {
+      setFormData((prev) => ({
+        ...prev,
+        driverName:
+          existingDriver.name || "",
+        driverNumber:
+          existingDriver.number || "",
+      }));
+
+      setDriverOtpVerified(true);
+      setDriverOtpSent(false);
+
+      setDriverMessage(
+        "Existing driver found. OTP is not required."
+      );
+
+      return;
+    }
+
+    // =================================================
+    // DEVELOPMENT OTP
+    // =================================================
+
+    const newOtp =
+      Math.floor(
+        100000 +
+          Math.random() *
+            900000
+      ).toString();
+
+    setDriverGeneratedOtp(
+      newOtp
+    );
+
+    setDriverOtp("");
+    setDriverOtpSent(true);
+    setDriverOtpVerified(false);
+
+    console.log(
+      "NEW DRIVER OTP:",
+      newOtp
+    );
+
+    setDriverMessage(
+      `Development Driver OTP: ${newOtp}`
+    );
+  };
+
+  // =====================================================
+  // VERIFY DRIVER OTP
+  // =====================================================
+
+  const handleVerifyDriverOtp = () => {
+    setError("");
+
+    if (!driverOtp) {
+      setError(
+        "Please enter driver OTP."
+      );
+      return;
+    }
+
+    if (
+      driverOtp !==
+      driverGeneratedOtp
+    ) {
+      setError(
+        "Invalid driver OTP. Please try again."
+      );
+      return;
+    }
+
+    setDriverOtpVerified(true);
+    setDriverOtpSent(false);
+
+    setDriverMessage(
+      "Driver mobile number verified successfully."
     );
   };
 
@@ -437,9 +852,11 @@ function AddWorkDetails() {
     e.preventDefault();
 
     setError("");
-    setMessage("");
 
-    // New customer must verify OTP
+    // =================================================
+    // CUSTOMER VERIFICATION
+    // =================================================
+
     if (
       isNewCustomer &&
       !otpVerified
@@ -450,12 +867,52 @@ function AddWorkDetails() {
       return;
     }
 
+    // =================================================
+    // DRIVER VERIFICATION
+    // =================================================
+
+    if (
+      driverSelection === "new" &&
+      !driverOtpVerified
+    ) {
+      setError(
+        "Please verify the driver mobile number first."
+      );
+      return;
+    }
+
+    // =================================================
+    // SELF DRIVER
+    // =================================================
+
+    if (
+      driverSelection === "self"
+    ) {
+      if (
+        !userProfile?.name ||
+        !userProfile?.number
+      ) {
+        setError(
+          "Unable to get your profile details. Please try again."
+        );
+        return;
+      }
+    }
+
+    // =================================================
+    // VEHICLE
+    // =================================================
+
     if (!vehicle) {
       setError(
         "Vehicle information is missing."
       );
       return;
     }
+
+    // =================================================
+    // CUSTOMER
+    // =================================================
 
     if (
       !formData.customerName.trim()
@@ -467,13 +924,19 @@ function AddWorkDetails() {
     }
 
     if (
-      !formData.customerNumber.trim()
+      !/^[6-9]\d{9}$/.test(
+        formData.customerNumber
+      )
     ) {
       setError(
-        "Customer mobile number is required."
+        "Please enter a valid customer mobile number."
       );
       return;
     }
+
+    // =================================================
+    // WORK TYPE
+    // =================================================
 
     if (!formData.workType) {
       setError(
@@ -482,12 +945,20 @@ function AddWorkDetails() {
       return;
     }
 
+    // =================================================
+    // DATE
+    // =================================================
+
     if (!formData.date) {
       setError(
         "Please select work date."
       );
       return;
     }
+
+    // =================================================
+    // AMOUNT
+    // =================================================
 
     if (
       !formData.amount ||
@@ -502,12 +973,9 @@ function AddWorkDetails() {
     const totalAmount =
       Number(formData.amount);
 
-    // =====================================================
+    // =================================================
     // PAID
-    //
-    // Empty = 0
-    // Entered = entered amount
-    // =====================================================
+    // =================================================
 
     const paidAmount =
       formData.paid === "" ||
@@ -532,32 +1000,11 @@ function AddWorkDetails() {
       return;
     }
 
-    // =====================================================
+    // =================================================
     // ACRES
-    //
-    // Default = 0
-    // =====================================================
+    // =================================================
 
     let acresValue = 0;
-
-    /*
-      Acres required:
-
-      Tractor + Ploughing
-      Tractor + Cultivation
-      Tractor + Rotavator
-      Tractor + Harvesting
-
-      Harvester + non-Transport work
-
-      Acres = 0:
-
-      Tractor + Transport
-      JCB
-      Magic
-      Car / EV
-      Others
-    */
 
     const requiresAcres =
       (
@@ -568,7 +1015,6 @@ function AddWorkDetails() {
         "Transport";
 
     if (requiresAcres) {
-
       if (
         !formData.acres ||
         Number(formData.acres) <= 0
@@ -583,7 +1029,6 @@ function AddWorkDetails() {
         Number(formData.acres);
     }
 
-    // Transport = 0 acres
     if (
       formData.workType ===
       "Transport"
@@ -591,11 +1036,42 @@ function AddWorkDetails() {
       acresValue = 0;
     }
 
-    // =====================================================
+    // =================================================
+    // DRIVER DATA
+    // =================================================
+
+    let driverName = null;
+    let driverNumber = null;
+
+    if (
+      driverSelection === "self"
+    ) {
+      driverName =
+        userProfile.name;
+
+      driverNumber =
+        userProfile.number;
+    }
+
+    if (
+      driverSelection !== "none" &&
+      driverSelection !== "self"
+    ) {
+      if (
+        formData.driverName.trim() &&
+        formData.driverNumber.trim()
+      ) {
+        driverName =
+          formData.driverName.trim();
+
+        driverNumber =
+          formData.driverNumber.trim();
+      }
+    }
+
+    // =================================================
     // WORK DATA
-    //
-    // NO DUE FIELD
-    // =====================================================
+    // =================================================
 
     const workData = {
       machine: vehicle,
@@ -603,23 +1079,33 @@ function AddWorkDetails() {
       workType:
         formData.workType,
 
-      date: formData.date,
+      date:
+        formData.date,
 
-      amount: totalAmount,
+      amount:
+        totalAmount,
 
-      acres: acresValue,
+      acres:
+        acresValue,
 
-      paid: paidAmount,
+      paid:
+        paidAmount,
 
       customerName:
         formData.customerName.trim(),
 
       customerNumber:
         formData.customerNumber.trim(),
+
+      driverName:
+        driverName,
+
+      driverNumber:
+        driverNumber,
     };
 
     console.log(
-      "WORK DATA:",
+      "FINAL WORK DATA:",
       workData
     );
 
@@ -642,7 +1128,6 @@ function AddWorkDetails() {
       );
 
       navigate("/owner");
-
     } catch (err) {
       console.error(
         "SAVE WORK ERROR:",
@@ -658,17 +1143,14 @@ function AddWorkDetails() {
         );
 
         navigate("/login");
-
         return;
       }
 
       setError(
-        err.response?.data
-          ?.message ||
+        err.response?.data?.message ||
           err.response?.data ||
           "Failed to save work."
       );
-
     } finally {
       setSaving(false);
     }
@@ -676,8 +1158,6 @@ function AddWorkDetails() {
 
   // =====================================================
   // DUE
-  //
-  // Empty paid is 0
   // =====================================================
 
   const due =
@@ -766,11 +1246,28 @@ function AddWorkDetails() {
               VEHICLE
           ================================================= */}
 
-          <section className="bg-white border rounded-2xl p-5 shadow-sm mb-5">
+          <section className="
+            bg-white
+            border
+            border-slate-200
+            rounded-2xl
+            p-5
+            shadow-sm
+            mb-5
+          ">
 
             <div className="flex items-center gap-4">
 
-              <div className="w-14 h-14 rounded-xl bg-green-50 flex items-center justify-center text-3xl">
+              <div className="
+                w-14
+                h-14
+                rounded-xl
+                bg-green-50
+                flex
+                items-center
+                justify-center
+                text-3xl
+              ">
                 {getVehicleIcon(
                   vehicle
                 )}
@@ -796,54 +1293,53 @@ function AddWorkDetails() {
               CUSTOMER DETAILS
           ================================================= */}
 
-          <section className="bg-white border rounded-2xl p-5 shadow-sm mb-5">
+          <section className="
+            bg-white
+            border
+            border-slate-200
+            rounded-2xl
+            p-5
+            shadow-sm
+            mb-5
+          ">
 
-            <div className="flex items-start justify-between gap-3 mb-5">
+            <div className="
+              flex
+              items-start
+              justify-between
+              gap-3
+              mb-5
+            ">
 
-              <div className="min-w-0">
+              <div>
 
                 <h2 className="text-lg font-bold text-gray-900">
                   Customer Details
                 </h2>
 
                 <p className="text-xs text-gray-500 mt-1">
-
                   {customerExists
                     ? "Existing customer found automatically."
-                    : isNewCustomer
-                    ? "Enter new customer details and verify mobile number."
-                    : "Customer selected from your history."}
-
+                    : "Enter customer details and verify when required."}
                 </p>
 
               </div>
 
-              {!isNewCustomer && (
+              {customerExists && (
 
-                <span className="px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold shrink-0">
-                  Selected
+                <span className="
+                  px-3
+                  py-1
+                  rounded-full
+                  bg-green-100
+                  text-green-700
+                  text-xs
+                  font-semibold
+                ">
+                  Existing
                 </span>
 
               )}
-
-              {isNewCustomer &&
-                customerExists && (
-
-                  <span className="px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold shrink-0">
-                    Existing
-                  </span>
-
-                )}
-
-              {isNewCustomer &&
-                !customerExists &&
-                otpVerified && (
-
-                  <span className="px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold shrink-0">
-                    Verified
-                  </span>
-
-                )}
 
             </div>
 
@@ -851,7 +1347,13 @@ function AddWorkDetails() {
 
             <div className="mb-5">
 
-              <label className="block text-sm font-semibold text-gray-800 mb-2">
+              <label className="
+                block
+                text-sm
+                font-semibold
+                text-gray-800
+                mb-2
+              ">
                 Customer Name
               </label>
 
@@ -891,11 +1393,22 @@ function AddWorkDetails() {
 
             <div>
 
-              <label className="block text-sm font-semibold text-gray-800 mb-2">
+              <label className="
+                block
+                text-sm
+                font-semibold
+                text-gray-800
+                mb-2
+              ">
                 Customer Mobile Number
               </label>
 
-              <div className="flex flex-col sm:flex-row gap-2 w-full">
+              <div className="
+                flex
+                flex-col
+                sm:flex-row
+                gap-2
+              ">
 
                 <input
                   type="tel"
@@ -930,8 +1443,6 @@ function AddWorkDetails() {
                   `}
                 />
 
-                {/* SEND OTP */}
-
                 {isNewCustomer &&
                   !customerExists &&
                   !otpVerified && (
@@ -953,7 +1464,6 @@ function AddWorkDetails() {
                         rounded-xl
                         font-bold
                         whitespace-nowrap
-                        shrink-0
                       "
                     >
                       Send OTP
@@ -963,50 +1473,75 @@ function AddWorkDetails() {
 
               </div>
 
-              {/* CHECKING */}
-
               {checkingCustomer && (
 
-                <p className="mt-2 text-xs text-gray-500">
+                <p className="
+                  mt-2
+                  text-xs
+                  text-gray-500
+                ">
                   Checking customer...
                 </p>
 
               )}
 
-              {/* EXISTING CUSTOMER */}
+              {customerExists && (
 
-              {isNewCustomer &&
-                customerExists && (
+                <div className="
+                  mt-3
+                  bg-green-50
+                  border
+                  border-green-200
+                  rounded-xl
+                  p-3
+                ">
 
-                  <div className="mt-3 bg-green-50 border border-green-200 rounded-xl p-3">
+                  <p className="
+                    text-sm
+                    font-semibold
+                    text-green-700
+                  ">
+                    ✓ Existing customer found
+                  </p>
 
-                    <p className="text-sm font-semibold text-green-700">
-                      ✓ Existing customer found
-                    </p>
+                  <p className="
+                    text-xs
+                    text-green-600
+                    mt-1
+                  ">
+                    Customer name has been filled
+                    automatically. OTP is not required.
+                  </p>
 
-                    <p className="text-xs text-green-600 mt-1">
-                      Customer name has been filled
-                      automatically. OTP is not required.
-                    </p>
+                </div>
 
-                  </div>
-
-                )}
+              )}
 
             </div>
 
-            {/* =================================================
-                OTP BOX
-            ================================================= */}
+            {/* CUSTOMER OTP */}
 
             {isNewCustomer &&
               !customerExists &&
               otpSent &&
               !otpVerified && (
 
-                <div className="mt-5 w-full bg-slate-50 border border-slate-200 rounded-xl p-4">
+                <div className="
+                  mt-5
+                  bg-slate-50
+                  border
+                  border-slate-200
+                  rounded-xl
+                  p-4
+                ">
 
-                  <label className="block text-sm font-semibold text-gray-800 mb-2">
+                  <label className="
+                    block
+                    text-sm
+                    font-semibold
+                    text-gray-800
+                    mb-2
+                  ">
                     Enter OTP
                   </label>
 
@@ -1015,8 +1550,7 @@ function AddWorkDetails() {
                     value={otp}
                     maxLength={6}
                     inputMode="numeric"
-                    onChange={(e) => {
-
+                    onChange={(e) =>
                       setOtp(
                         e.target.value
                           .replace(
@@ -1027,11 +1561,8 @@ function AddWorkDetails() {
                             0,
                             6
                           )
-                      );
-
-                      setError("");
-
-                    }}
+                      )
+                    }
                     placeholder="Enter 6-digit OTP"
                     className="
                       w-full
@@ -1045,8 +1576,6 @@ function AddWorkDetails() {
                       tracking-[0.5em]
                       outline-none
                       focus:border-green-500
-                      focus:ring-2
-                      focus:ring-green-100
                     "
                   />
 
@@ -1089,21 +1618,588 @@ function AddWorkDetails() {
 
               )}
 
-            {/* NEW CUSTOMER OTP MESSAGE */}
+            {customerMessage && (
 
-            {isNewCustomer &&
-              !customerExists &&
-              message && (
+              <div className="
+                mt-4
+                bg-green-50
+                border
+                border-green-200
+                rounded-xl
+                p-3
+              ">
 
-                <div className="mt-4 bg-green-50 border border-green-200 rounded-xl p-3">
+                <p className="
+                  text-sm
+                  text-green-700
+                  break-words
+                ">
+                  {customerMessage}
+                </p>
 
-                  <p className="text-sm text-green-700 break-words">
-                    {message}
+              </div>
+
+            )}
+
+          </section>
+
+          {/* =================================================
+              DRIVER
+          ================================================= */}
+
+          <section className="
+            bg-white
+            border
+            border-slate-200
+            rounded-2xl
+            p-5
+            shadow-sm
+            mb-5
+          ">
+
+            <div className="mb-5">
+
+              <h2 className="
+                text-lg
+                font-bold
+                text-gray-900
+              ">
+                Driver
+              </h2>
+
+              <p className="
+                text-xs
+                text-gray-500
+                mt-1
+              ">
+                Select a driver for this work.
+              </p>
+
+            </div>
+
+            {/* DRIVER SELECT */}
+
+            <div>
+
+              <label className="
+                block
+                text-sm
+                font-semibold
+                text-gray-800
+                mb-2
+              ">
+                Select Driver
+              </label>
+
+              <select
+                value={
+                  driverSelection
+                }
+                onChange={
+                  handleDriverSelection
+                }
+                className="
+                  w-full
+                  border
+                  border-gray-300
+                  rounded-xl
+                  px-4
+                  py-3
+                  bg-white
+                  outline-none
+                  focus:border-green-500
+                  focus:ring-2
+                  focus:ring-green-100
+                "
+              >
+
+                <option value="none">
+                  No Driver
+                </option>
+
+                {drivers.length > 0 && (
+                  <option disabled>
+                    ── My Drivers ──
+                  </option>
+                )}
+
+                {drivers.map(
+                  (driver, index) => (
+
+                    <option
+                      key={`${driver.number}-${index}`}
+                      value={index}
+                    >
+                      {driver.name} -{" "}
+                      {driver.number}
+                    </option>
+
+                  )
+                )}
+
+                <option value="self">
+                  I am the Driver
+                </option>
+
+                <option value="new">
+                  + Add New Driver
+                </option>
+
+              </select>
+
+            </div>
+
+            {/* LOADING */}
+
+            {driverChecking && (
+
+              <p className="
+                mt-2
+                text-xs
+                text-gray-500
+              ">
+                Loading drivers...
+              </p>
+
+            )}
+
+            {/* =================================================
+                SELF DRIVER
+            ================================================= */}
+
+            {driverSelection ===
+              "self" && (
+
+                <div className="
+                  mt-4
+                  bg-green-50
+                  border
+                  border-green-200
+                  rounded-xl
+                  p-4
+                ">
+
+                  <div className="
+                    flex
+                    items-center
+                    gap-3
+                  ">
+
+                    <div className="
+                      w-11
+                      h-11
+                      rounded-full
+                      bg-green-100
+                      flex
+                      items-center
+                      justify-center
+                      text-xl
+                    ">
+                      👤
+                    </div>
+
+                    <div>
+
+                      <p className="
+                        text-sm
+                        font-bold
+                        text-green-800
+                      ">
+                        {loadingProfile
+                          ? "Loading..."
+                          : userProfile?.name ||
+                            "User"}
+                      </p>
+
+                      <p className="
+                        text-xs
+                        text-green-600
+                        mt-1
+                      ">
+                        {loadingProfile
+                          ? "Loading number..."
+                          : userProfile?.number ||
+                            "Number unavailable"}
+                      </p>
+
+                    </div>
+
+                  </div>
+
+                  {userProfile?.name &&
+                    userProfile?.number && (
+
+                      <p className="
+                        text-xs
+                        text-green-600
+                        mt-3
+                      ">
+                        ✓ Your profile details will be
+                        saved as the driver. OTP is not required.
+                      </p>
+
+                    )}
+
+                </div>
+
+              )}
+
+            {/* =================================================
+                EXISTING DRIVER
+            ================================================= */}
+
+            {driverSelection !==
+              "none" &&
+              driverSelection !==
+                "new" &&
+              driverSelection !==
+                "self" &&
+              formData.driverName && (
+
+                <div className="
+                  mt-4
+                  bg-green-50
+                  border
+                  border-green-200
+                  rounded-xl
+                  p-4
+                ">
+
+                  <div className="
+                    flex
+                    items-center
+                    gap-3
+                  ">
+
+                    <div className="
+                      w-10
+                      h-10
+                      rounded-full
+                      bg-green-100
+                      flex
+                      items-center
+                      justify-center
+                      text-lg
+                    ">
+                      🚚
+                    </div>
+
+                    <div>
+
+                      <p className="
+                        text-sm
+                        font-bold
+                        text-green-800
+                      ">
+                        {formData.driverName}
+                      </p>
+
+                      <p className="
+                        text-xs
+                        text-green-600
+                        mt-1
+                      ">
+                        {formData.driverNumber}
+                      </p>
+
+                    </div>
+
+                  </div>
+
+                  <p className="
+                    text-xs
+                    text-green-600
+                    mt-3
+                  ">
+                    ✓ Existing driver selected.
+                    OTP is not required.
                   </p>
 
                 </div>
 
               )}
+
+            {/* =================================================
+                NEW DRIVER
+            ================================================= */}
+
+            {driverSelection ===
+              "new" && (
+
+                <div className="mt-5">
+
+                  {/* DRIVER NAME */}
+
+                  <div className="mb-5">
+
+                    <label className="
+                      block
+                      text-sm
+                      font-semibold
+                      text-gray-800
+                      mb-2
+                    ">
+                      Driver Name
+                    </label>
+
+                    <input
+                      type="text"
+                      value={
+                        formData.driverName
+                      }
+                      onChange={
+                        handleDriverNameChange
+                      }
+                      readOnly={
+                        driverOtpVerified
+                      }
+                      placeholder="Enter driver name"
+                      className={`
+                        w-full
+                        border
+                        rounded-xl
+                        px-4
+                        py-3
+                        outline-none
+                        ${
+                          driverOtpVerified
+                            ? "bg-gray-100 border-gray-300"
+                            : "bg-white border-gray-300 focus:border-green-500"
+                        }
+                      `}
+                    />
+
+                  </div>
+
+                  {/* DRIVER NUMBER */}
+
+                  <div>
+
+                    <label className="
+                      block
+                      text-sm
+                      font-semibold
+                      text-gray-800
+                      mb-2
+                    ">
+                      Driver Mobile Number
+                    </label>
+
+                    <div className="
+                      flex
+                      flex-col
+                      sm:flex-row
+                      gap-2
+                    ">
+
+                      <input
+                        type="tel"
+                        value={
+                          formData.driverNumber
+                        }
+                        onChange={
+                          handleDriverNumberChange
+                        }
+                        readOnly={
+                          driverOtpVerified
+                        }
+                        maxLength={10}
+                        inputMode="numeric"
+                        placeholder="Enter 10-digit mobile number"
+                        className={`
+                          w-full
+                          border
+                          rounded-xl
+                          px-4
+                          py-3
+                          outline-none
+                          ${
+                            driverOtpVerified
+                              ? "bg-gray-100 border-gray-300"
+                              : "bg-white border-gray-300 focus:border-green-500"
+                          }
+                        `}
+                      />
+
+                      {!driverOtpVerified && (
+
+                        <button
+                          type="button"
+                          onClick={
+                            handleSendDriverOtp
+                          }
+                          className="
+                            w-full
+                            sm:w-auto
+                            sm:min-w-[120px]
+                            px-5
+                            py-3
+                            bg-green-600
+                            hover:bg-green-700
+                            text-white
+                            rounded-xl
+                            font-bold
+                            whitespace-nowrap
+                          "
+                        >
+                          Send OTP
+                        </button>
+
+                      )}
+
+                    </div>
+
+                  </div>
+
+                  {/* DRIVER OTP */}
+
+                  {driverOtpSent &&
+                    !driverOtpVerified && (
+
+                      <div className="
+                        mt-5
+                        bg-slate-50
+                        border
+                        border-slate-200
+                        rounded-xl
+                        p-4
+                      ">
+
+                        <label className="
+                          block
+                          text-sm
+                          font-semibold
+                          text-gray-800
+                          mb-2
+                        ">
+                          Enter Driver OTP
+                        </label>
+
+                        <input
+                          type="text"
+                          value={
+                            driverOtp
+                          }
+                          maxLength={6}
+                          inputMode="numeric"
+                          onChange={(e) =>
+                            setDriverOtp(
+                              e.target.value
+                                .replace(
+                                  /\D/g,
+                                  ""
+                                )
+                                .slice(
+                                  0,
+                                  6
+                                )
+                            )
+                          }
+                          placeholder="Enter 6-digit OTP"
+                          className="
+                            w-full
+                            border
+                            border-gray-300
+                            rounded-xl
+                            px-4
+                            py-3
+                            text-center
+                            text-xl
+                            tracking-[0.5em]
+                            outline-none
+                            focus:border-green-500
+                          "
+                        />
+
+                        <button
+                          type="button"
+                          onClick={
+                            handleVerifyDriverOtp
+                          }
+                          className="
+                            w-full
+                            mt-4
+                            bg-green-600
+                            hover:bg-green-700
+                            text-white
+                            py-3.5
+                            rounded-xl
+                            font-bold
+                          "
+                        >
+                          Verify Driver OTP
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={
+                            handleSendDriverOtp
+                          }
+                          className="
+                            w-full
+                            mt-3
+                            text-green-700
+                            text-sm
+                            font-semibold
+                          "
+                        >
+                          Resend OTP
+                        </button>
+
+                      </div>
+
+                    )}
+
+                  {driverOtpVerified && (
+
+                    <div className="
+                      mt-4
+                      bg-green-50
+                      border
+                      border-green-200
+                      rounded-xl
+                      p-3
+                    ">
+
+                      <p className="
+                        text-sm
+                        font-semibold
+                        text-green-700
+                      ">
+                        ✓ Driver mobile number verified
+                      </p>
+
+                    </div>
+
+                  )}
+
+                </div>
+
+              )}
+
+            {/* DRIVER MESSAGE */}
+
+            {driverMessage && (
+
+              <div className="
+                mt-4
+                bg-green-50
+                border
+                border-green-200
+                rounded-xl
+                p-3
+              ">
+
+                <p className="
+                  text-sm
+                  text-green-700
+                ">
+                  {driverMessage}
+                </p>
+
+              </div>
+
+            )}
 
           </section>
 
@@ -1111,9 +2207,22 @@ function AddWorkDetails() {
               WORK DETAILS
           ================================================= */}
 
-          <section className="bg-white border rounded-2xl p-5 shadow-sm mb-5">
+          <section className="
+            bg-white
+            border
+            border-slate-200
+            rounded-2xl
+            p-5
+            shadow-sm
+            mb-5
+          ">
 
-            <h2 className="text-lg font-bold text-gray-900 mb-5">
+            <h2 className="
+              text-lg
+              font-bold
+              text-gray-900
+              mb-5
+            ">
               Work Details
             </h2>
 
@@ -1121,7 +2230,13 @@ function AddWorkDetails() {
 
             <div className="mb-5">
 
-              <label className="block text-sm font-semibold text-gray-800 mb-2">
+              <label className="
+                block
+                text-sm
+                font-semibold
+                text-gray-800
+                mb-2
+              ">
                 Work Type
               </label>
 
@@ -1143,8 +2258,6 @@ function AddWorkDetails() {
                   bg-white
                   outline-none
                   focus:border-green-500
-                  focus:ring-2
-                  focus:ring-green-100
                 "
               >
 
@@ -1173,7 +2286,13 @@ function AddWorkDetails() {
 
             <div className="mb-5">
 
-              <label className="block text-sm font-semibold text-gray-800 mb-2">
+              <label className="
+                block
+                text-sm
+                font-semibold
+                text-gray-800
+                mb-2
+              ">
                 Work Date
               </label>
 
@@ -1195,17 +2314,12 @@ function AddWorkDetails() {
                   py-3
                   outline-none
                   focus:border-green-500
-                  focus:ring-2
-                  focus:ring-green-100
                 "
               />
 
             </div>
 
-            {/* =================================================
-                ACRES
-                HIDDEN FOR TRANSPORT
-            ================================================= */}
+            {/* ACRES */}
 
             {(vehicle === "Tractor" ||
               vehicle === "Harvester") &&
@@ -1214,7 +2328,13 @@ function AddWorkDetails() {
 
                 <div>
 
-                  <label className="block text-sm font-semibold text-gray-800 mb-2">
+                  <label className="
+                    block
+                    text-sm
+                    font-semibold
+                    text-gray-800
+                    mb-2
+                  ">
                     Acres
                   </label>
 
@@ -1239,8 +2359,6 @@ function AddWorkDetails() {
                       py-3
                       outline-none
                       focus:border-green-500
-                      focus:ring-2
-                      focus:ring-green-100
                     "
                   />
 
@@ -1254,23 +2372,49 @@ function AddWorkDetails() {
               PAYMENT DETAILS
           ================================================= */}
 
-          <section className="bg-white border rounded-2xl p-5 shadow-sm mb-5">
+          <section className="
+            bg-white
+            border
+            border-slate-200
+            rounded-2xl
+            p-5
+            shadow-sm
+            mb-5
+          ">
 
-            <h2 className="text-lg font-bold text-gray-900 mb-5">
+            <h2 className="
+              text-lg
+              font-bold
+              text-gray-900
+              mb-5
+            ">
               Payment Details
             </h2>
 
-            {/* TOTAL AMOUNT */}
+            {/* AMOUNT */}
 
             <div className="mb-5">
 
-              <label className="block text-sm font-semibold text-gray-800 mb-2">
+              <label className="
+                block
+                text-sm
+                font-semibold
+                text-gray-800
+                mb-2
+              ">
                 Total Amount
               </label>
 
               <div className="relative">
 
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-semibold">
+                <span className="
+                  absolute
+                  left-4
+                  top-1/2
+                  -translate-y-1/2
+                  text-gray-500
+                  font-semibold
+                ">
                   ₹
                 </span>
 
@@ -1296,8 +2440,6 @@ function AddWorkDetails() {
                     py-3
                     outline-none
                     focus:border-green-500
-                    focus:ring-2
-                    focus:ring-green-100
                   "
                 />
 
@@ -1305,17 +2447,30 @@ function AddWorkDetails() {
 
             </div>
 
-            {/* PAID AMOUNT */}
+            {/* PAID */}
 
             <div className="mb-5">
 
-              <label className="block text-sm font-semibold text-gray-800 mb-2">
+              <label className="
+                block
+                text-sm
+                font-semibold
+                text-gray-800
+                mb-2
+              ">
                 Paid Amount
               </label>
 
               <div className="relative">
 
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-semibold">
+                <span className="
+                  absolute
+                  left-4
+                  top-1/2
+                  -translate-y-1/2
+                  text-gray-500
+                  font-semibold
+                ">
                   ₹
                 </span>
 
@@ -1341,8 +2496,6 @@ function AddWorkDetails() {
                     py-3
                     outline-none
                     focus:border-green-500
-                    focus:ring-2
-                    focus:ring-green-100
                   "
                 />
 
@@ -1352,22 +2505,41 @@ function AddWorkDetails() {
 
             {/* DUE */}
 
-            <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex items-center justify-between">
+            <div className="
+              bg-orange-50
+              border
+              border-orange-200
+              rounded-xl
+              p-4
+              flex
+              items-center
+              justify-between
+            ">
 
               <div>
 
-                <p className="text-sm text-gray-600">
+                <p className="
+                  text-sm
+                  text-gray-600
+                ">
                   Due Amount
                 </p>
 
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="
+                  text-xs
+                  text-gray-400
+                  mt-1
+                ">
                   Remaining amount
                 </p>
 
               </div>
 
-              <p className="text-xl font-bold text-orange-600">
-
+              <p className="
+                text-xl
+                font-bold
+                text-orange-600
+              ">
                 ₹
                 {Math.max(
                   due,
@@ -1375,7 +2547,6 @@ function AddWorkDetails() {
                 ).toLocaleString(
                   "en-IN"
                 )}
-
               </p>
 
             </div>
@@ -1388,9 +2559,20 @@ function AddWorkDetails() {
 
           {error && (
 
-            <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-5">
+            <div className="
+              bg-red-50
+              border
+              border-red-200
+              rounded-xl
+              p-4
+              mb-5
+            ">
 
-              <p className="text-sm text-red-600 font-medium">
+              <p className="
+                text-sm
+                text-red-600
+                font-medium
+              ">
                 {error}
               </p>
 
@@ -1409,6 +2591,19 @@ function AddWorkDetails() {
               (
                 isNewCustomer &&
                 !otpVerified
+              ) ||
+              (
+                driverSelection ===
+                  "new" &&
+                !driverOtpVerified
+              ) ||
+              (
+                driverSelection ===
+                  "self" &&
+                (
+                  !userProfile?.name ||
+                  !userProfile?.number
+                )
               )
             }
             className={`
@@ -1424,17 +2619,28 @@ function AddWorkDetails() {
                 (
                   isNewCustomer &&
                   !otpVerified
+                ) ||
+                (
+                  driverSelection ===
+                    "new" &&
+                  !driverOtpVerified
+                ) ||
+                (
+                  driverSelection ===
+                    "self" &&
+                  (
+                    !userProfile?.name ||
+                    !userProfile?.number
+                  )
                 )
                   ? "bg-green-400 cursor-not-allowed"
                   : "bg-green-600 hover:bg-green-700"
               }
             `}
           >
-
             {saving
               ? "Saving Work..."
               : "Save Work"}
-
           </button>
 
         </form>
@@ -1453,7 +2659,6 @@ function getWorkTypes(
   vehicle
 ) {
   const workTypes = {
-
     Tractor: [
       "Ploughing",
       "Cultivation",
@@ -1515,17 +2720,11 @@ function getVehicleIcon(
   vehicle
 ) {
   const icons = {
-
     Tractor: "🚜",
-
     JCB: "🏗️",
-
     Harvester: "🌾",
-
     Magic: "🚐",
-
     "Car / EV": "🚗",
-
     Other: "🚛",
   };
 
