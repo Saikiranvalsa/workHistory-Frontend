@@ -13,6 +13,7 @@ import OwnerCustomers from "./pages/owner/OwnerCustomers";
 import CustomerDetails from "./pages/owner/CustomerDetails";
 import CustomerWorkHistory from "./pages/owner/CustomerWorkHistory";
 import CustomerDashboard from "./pages/customer/CustomerDashboard";
+import Profile from "./pages/Profile";
 function App() {
   return (
     <BrowserRouter>
@@ -89,6 +90,7 @@ function App() {
           path="/customer"
           element={<CustomerDashboard />}
         />
+        <Route path="/profile" element={<Profile />} />
 
         
 

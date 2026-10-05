@@ -7,6 +7,7 @@ function OwnerDashboard() {
 
   const [works, setWorks] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // =====================================================
   // LOAD WORKS
@@ -20,40 +21,51 @@ function OwnerDashboard() {
     try {
       setLoading(true);
 
-      const response = await api.get(
-        "/owner/works"
-      );
+      const response = await api.get("/owner/works");
 
-      console.log(
-        "OWNER WORKS:",
-        response.data
-      );
+      console.log("OWNER WORKS:", response.data);
 
       setWorks(
         Array.isArray(response.data)
           ? response.data
           : []
       );
-
     } catch (error) {
-      console.error(
-        "WORK LOAD ERROR:",
-        error
-      );
+      console.error("WORK LOAD ERROR:", error);
 
-      if (
-        error.response?.status === 401
-      ) {
-        localStorage.removeItem(
-          "JWT_TOKEN"
-        );
-
+      if (error.response?.status === 401) {
+        localStorage.removeItem("JWT_TOKEN");
         navigate("/login");
       }
-
     } finally {
       setLoading(false);
     }
+  };
+
+  // =====================================================
+  // CLOSE SIDEBAR
+  // =====================================================
+
+  const closeSidebar = () => {
+    setSidebarOpen(false);
+  };
+
+  // =====================================================
+  // GO TO PROFILE
+  // =====================================================
+
+  const openProfile = () => {
+    closeSidebar();
+    navigate("/profile");
+  };
+
+  // =====================================================
+  // GO TO DRIVERS
+  // =====================================================
+
+  const openDrivers = () => {
+    closeSidebar();
+    navigate("/owner/drivers");
   };
 
   // =====================================================
@@ -109,8 +121,7 @@ function OwnerDashboard() {
   // =====================================================
 
   const getVehicleIcon = (machine) => {
-    const vehicle =
-      formatVehicle(machine);
+    const vehicle = formatVehicle(machine);
 
     if (vehicle === "Tractor") {
       return "🚜";
@@ -136,193 +147,145 @@ function OwnerDashboard() {
   };
 
   // =====================================================
-  // OPEN PARTICULAR VEHICLE
+  // OPEN VEHICLE HISTORY
   // =====================================================
 
-  const openVehicleHistory = (
-    vehicle
-  ) => {
-    navigate(
-      "/owner/work-history",
-      {
-        state: {
-          vehicle: vehicle,
-          selectVehicleMode: false,
-        },
-      }
-    );
+  const openVehicleHistory = (vehicle) => {
+    closeSidebar();
+
+    navigate("/owner/work-history", {
+      state: {
+        vehicle: vehicle,
+        selectVehicleMode: false,
+      },
+    });
   };
 
   // =====================================================
-  // SEE ALL - VEHICLE SELECTION
+  // OPEN ALL WORK HISTORY
   // =====================================================
 
   const openAllVehicles = () => {
-    navigate(
-      "/owner/work-history",
-      {
-        state: {
-          vehicle: "All",
-          selectVehicleMode: true,
-        },
-      }
-    );
+    closeSidebar();
+
+    navigate("/owner/work-history", {
+      state: {
+        vehicle: "All",
+        selectVehicleMode: true,
+      },
+    });
   };
 
   // =====================================================
-  // RECENT WORK - SEE ALL
-  //
-  // Opens complete work history directly.
+  // RECENT WORK HISTORY
   // =====================================================
 
   const openRecentWorkHistory = () => {
-    navigate(
-      "/owner/work-history",
-      {
-        state: {
-          vehicle: "All",
-          selectVehicleMode: false,
-        },
-      }
-    );
+    navigate("/owner/work-history", {
+      state: {
+        vehicle: "All",
+        selectVehicleMode: false,
+      },
+    });
   };
 
   // =====================================================
-  // MONEY
+  // FORMAT MONEY
   // =====================================================
 
-  const formatMoney = (
-    amount
-  ) => {
+  const formatMoney = (amount) => {
     return `₹${Number(
       amount || 0
-    ).toLocaleString(
-      "en-IN",
-      {
-        maximumFractionDigits: 2,
-      }
-    )}`;
+    ).toLocaleString("en-IN", {
+      maximumFractionDigits: 2,
+    })}`;
   };
 
   // =====================================================
-  // DATE
+  // FORMAT DATE
   // =====================================================
 
-  const formatDate = (
-    dateValue
-  ) => {
+  const formatDate = (dateValue) => {
     if (!dateValue) {
       return "";
     }
 
-    const date =
-      new Date(dateValue);
+    const date = new Date(dateValue);
 
-    if (
-      Number.isNaN(
-        date.getTime()
-      )
-    ) {
+    if (Number.isNaN(date.getTime())) {
       return "";
     }
 
-    const today =
-      new Date();
+    const today = new Date();
 
-    const todayStart =
-      new Date(
-        today.getFullYear(),
-        today.getMonth(),
-        today.getDate()
-      );
+    const todayStart = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate()
+    );
 
-    const workStart =
-      new Date(
-        date.getFullYear(),
-        date.getMonth(),
-        date.getDate()
-      );
+    const workStart = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate()
+    );
 
-    const difference =
-      Math.floor(
-        (todayStart -
-          workStart) /
-          (1000 *
-            60 *
-            60 *
-            24)
-      );
+    const difference = Math.floor(
+      (todayStart - workStart) /
+        (1000 * 60 * 60 * 24)
+    );
 
-    if (
-      difference === 0
-    ) {
+    if (difference === 0) {
       return "Today";
     }
 
-    if (
-      difference === 1
-    ) {
+    if (difference === 1) {
       return "Yesterday";
     }
 
-    return date.toLocaleDateString(
-      "en-IN",
-      {
-        day: "2-digit",
-        month: "short",
-      }
-    );
+    return date.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+    });
   };
 
   // =====================================================
   // RECENT WORK
   // =====================================================
 
-  const recentWorks =
-    useMemo(() => {
-      return [...works]
-        .sort(
-          (a, b) =>
-            new Date(
-              b.date || 0
-            ) -
-            new Date(
-              a.date || 0
-            )
-        )
-        .slice(0, 3);
-    }, [works]);
+  const recentWorks = useMemo(() => {
+    return [...works]
+      .sort(
+        (a, b) =>
+          new Date(b.date || 0) -
+          new Date(a.date || 0)
+      )
+      .slice(0, 3);
+  }, [works]);
 
   // =====================================================
   // VEHICLE TOTALS
   // =====================================================
 
-  const vehicleTotals =
-    useMemo(() => {
-      const totals = {};
+  const vehicleTotals = useMemo(() => {
+    const totals = {};
 
-      works.forEach(
-        (work) => {
-          const vehicle =
-            formatVehicle(
-              work.machine
-            );
-
-          if (
-            !totals[vehicle]
-          ) {
-            totals[vehicle] = 0;
-          }
-
-          totals[vehicle] +=
-            Number(
-              work.amount || 0
-            );
-        }
+    works.forEach((work) => {
+      const vehicle = formatVehicle(
+        work.machine
       );
 
-      return totals;
-    }, [works]);
+      if (!totals[vehicle]) {
+        totals[vehicle] = 0;
+      }
+
+      totals[vehicle] += Number(
+        work.amount || 0
+      );
+    });
+
+    return totals;
+  }, [works]);
 
   // =====================================================
   // CURRENT YEAR
@@ -331,29 +294,22 @@ function OwnerDashboard() {
   const currentYear =
     new Date().getFullYear();
 
-  const currentYearWorks =
-    useMemo(() => {
-      return works.filter(
-        (work) => {
-          if (!work.date) {
-            return false;
-          }
+  const currentYearWorks = useMemo(() => {
+    return works.filter((work) => {
+      if (!work.date) {
+        return false;
+      }
 
-          const workDate =
-            new Date(
-              work.date
-            );
-
-          return (
-            workDate.getFullYear() ===
-            currentYear
-          );
-        }
+      const workDate = new Date(
+        work.date
       );
-    }, [
-      works,
-      currentYear,
-    ]);
+
+      return (
+        workDate.getFullYear() ===
+        currentYear
+      );
+    });
+  }, [works, currentYear]);
 
   // =====================================================
   // YEARLY EARNINGS
@@ -362,10 +318,7 @@ function OwnerDashboard() {
   const totalEarnings =
     currentYearWorks.reduce(
       (sum, work) =>
-        sum +
-        Number(
-          work.amount || 0
-        ),
+        sum + Number(work.amount || 0),
       0
     );
 
@@ -376,10 +329,7 @@ function OwnerDashboard() {
   const totalPaid =
     currentYearWorks.reduce(
       (sum, work) =>
-        sum +
-        Number(
-          work.paid || 0
-        ),
+        sum + Number(work.paid || 0),
       0
     );
 
@@ -391,22 +341,15 @@ function OwnerDashboard() {
     currentYearWorks.reduce(
       (sum, work) => {
         const amount =
-          Number(
-            work.amount || 0
-          );
+          Number(work.amount || 0);
 
         const paid =
-          Number(
-            work.paid || 0
-          );
+          Number(work.paid || 0);
 
         const due =
-          work.due !==
-            undefined &&
+          work.due !== undefined &&
           work.due !== null
-            ? Number(
-                work.due || 0
-              )
+            ? Number(work.due || 0)
             : amount - paid;
 
         return sum + due;
@@ -415,7 +358,7 @@ function OwnerDashboard() {
     );
 
   // =====================================================
-  // ONLY FOUR VEHICLES
+  // VEHICLE CARDS
   // =====================================================
 
   const vehicleCards = [
@@ -445,11 +388,13 @@ function OwnerDashboard() {
           border-r
           border-slate-200
           flex-col
+          z-50
         "
       >
 
-        <div className="p-6">
+        {/* LOGO */}
 
+        <div className="p-6">
           <h1 className="text-2xl font-bold text-green-600">
             WorkHistory
           </h1>
@@ -457,15 +402,15 @@ function OwnerDashboard() {
           <p className="text-sm text-slate-400 mt-1">
             Owner Portal
           </p>
-
         </div>
+
+        {/* CHANGE ROLE */}
 
         <div className="px-5 py-4 border-b border-slate-200">
 
           <button
-            onClick={() =>
-              navigate("/role")
-            }
+            type="button"
+            onClick={() => navigate("/role")}
             className="
               w-full
               flex
@@ -480,25 +425,24 @@ function OwnerDashboard() {
               hover:bg-green-100
             "
           >
-
             🔄
 
             <span>
               Change Role
             </span>
-
           </button>
 
         </div>
+
+        {/* DESKTOP MENU */}
 
         <div className="flex-1 p-5 space-y-2">
 
           {/* DASHBOARD */}
 
           <button
-            onClick={() =>
-              navigate("/owner")
-            }
+            type="button"
+            onClick={() => navigate("/owner")}
             className="
               w-full
               flex
@@ -512,20 +456,16 @@ function OwnerDashboard() {
               font-semibold
             "
           >
-
             ⌂
-
             Dashboard
-
           </button>
 
           {/* PAYMENTS */}
 
           <button
+            type="button"
             onClick={() =>
-              navigate(
-                "/owner/payments"
-              )
+              navigate("/owner/payments")
             }
             className="
               w-full
@@ -539,19 +479,15 @@ function OwnerDashboard() {
               rounded-xl
             "
           >
-
             ₹
-
             Payments
-
           </button>
 
           {/* WORK HISTORY */}
 
           <button
-            onClick={
-              openAllVehicles
-            }
+            type="button"
+            onClick={openAllVehicles}
             className="
               w-full
               flex
@@ -564,20 +500,16 @@ function OwnerDashboard() {
               rounded-xl
             "
           >
-
             ▤
-
             Work History
-
           </button>
 
           {/* CUSTOMERS */}
 
           <button
+            type="button"
             onClick={() =>
-              navigate(
-                "/owner/customers"
-              )
+              navigate("/owner/customers")
             }
             className="
               w-full
@@ -591,16 +523,35 @@ function OwnerDashboard() {
               rounded-xl
             "
           >
-
             ♙
-
             Customers
+          </button>
 
+          {/* DRIVERS */}
+
+          <button
+            type="button"
+            onClick={openDrivers}
+            className="
+              w-full
+              flex
+              items-center
+              gap-4
+              px-4
+              py-3
+              text-slate-700
+              hover:bg-slate-50
+              rounded-xl
+            "
+          >
+            🚚
+            Drivers
           </button>
 
           {/* VEHICLE TYPES */}
 
           <button
+            type="button"
             className="
               w-full
               flex
@@ -613,16 +564,14 @@ function OwnerDashboard() {
               rounded-xl
             "
           >
-
             🚜
-
             Vehicle Types
-
           </button>
 
           {/* PROFIT HISTORY */}
 
           <button
+            type="button"
             className="
               w-full
               flex
@@ -635,16 +584,15 @@ function OwnerDashboard() {
               rounded-xl
             "
           >
-
             ▥
-
             Profit History
-
           </button>
 
           {/* PROFILE */}
 
           <button
+            type="button"
+            onClick={openProfile}
             className="
               w-full
               flex
@@ -657,28 +605,44 @@ function OwnerDashboard() {
               rounded-xl
             "
           >
-
             ♙
-
             Profile
+          </button>
 
+          {/* REFER & EARN */}
+
+          <button
+            type="button"
+            className="
+              w-full
+              flex
+              items-center
+              gap-4
+              px-4
+              py-3
+              text-slate-700
+              hover:bg-slate-50
+              rounded-xl
+            "
+          >
+            🎁
+            Refer & Earn
           </button>
 
         </div>
 
-        {/* LOGOUT */}
+        {/* DESKTOP LOGOUT */}
 
         <div className="border-t border-slate-200 p-5">
 
           <button
+            type="button"
             onClick={() => {
-
               localStorage.removeItem(
                 "JWT_TOKEN"
               );
 
               navigate("/login");
-
             }}
             className="
               w-full
@@ -692,11 +656,8 @@ function OwnerDashboard() {
               hover:bg-red-50
             "
           >
-
             →
-
             Logout
-
           </button>
 
         </div>
@@ -704,7 +665,441 @@ function OwnerDashboard() {
       </aside>
 
       {/* =================================================
-          MAIN
+          MOBILE SIDEBAR OVERLAY
+      ================================================= */}
+
+      {sidebarOpen && (
+        <div
+          className="
+            md:hidden
+            fixed
+            inset-0
+            bg-black/40
+            z-[60]
+          "
+          onClick={closeSidebar}
+        />
+      )}
+
+      {/* =================================================
+          MOBILE SIDEBAR
+      ================================================= */}
+
+      <aside
+        className={`
+          md:hidden
+          fixed
+          top-0
+          left-0
+          bottom-0
+          w-[280px]
+          bg-white
+          z-[70]
+          shadow-2xl
+          transform
+          transition-transform
+          duration-300
+          ${
+            sidebarOpen
+              ? "translate-x-0"
+              : "-translate-x-full"
+          }
+        `}
+      >
+
+        {/* SIDEBAR HEADER */}
+
+        <div
+          className="
+            p-5
+            border-b
+            border-slate-200
+            flex
+            items-center
+            justify-between
+          "
+        >
+
+          <div>
+            <h1 className="text-xl font-bold text-green-600">
+              WorkHistory
+            </h1>
+
+            <p className="text-xs text-slate-400 mt-1">
+              Owner Portal
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={closeSidebar}
+            className="
+              w-10
+              h-10
+              rounded-full
+              bg-slate-100
+              text-slate-600
+              flex
+              items-center
+              justify-center
+              text-xl
+            "
+          >
+            ×
+          </button>
+
+        </div>
+
+        {/* OWNER */}
+
+        <button
+          type="button"
+          onClick={openProfile}
+          className="
+            w-full
+            p-5
+            border-b
+            border-slate-200
+            flex
+            items-center
+            gap-3
+            text-left
+            hover:bg-slate-50
+          "
+        >
+
+          <div
+            className="
+              w-12
+              h-12
+              rounded-full
+              bg-green-100
+              text-green-700
+              flex
+              items-center
+              justify-center
+              font-bold
+            "
+          >
+            VS
+          </div>
+
+          <div>
+            <p className="font-bold text-lg">
+              Owner
+            </p>
+
+            <p className="text-xs text-slate-500">
+              WorkHistory
+            </p>
+          </div>
+
+        </button>
+
+        {/* MOBILE MENU */}
+
+        <div
+          className="
+            p-4
+            overflow-y-auto
+            h-[calc(100%-180px)]
+          "
+        >
+
+          {/* CHANGE ROLE */}
+
+          <button
+            type="button"
+            onClick={() => {
+              closeSidebar();
+              navigate("/role");
+            }}
+            className="
+              w-full
+              flex
+              items-center
+              gap-4
+              px-4
+              py-3
+              mb-2
+              rounded-xl
+              bg-green-50
+              text-green-700
+              font-semibold
+            "
+          >
+            <span>🔄</span>
+
+            <span>
+              Change Role
+            </span>
+          </button>
+
+          {/* DASHBOARD */}
+
+          <button
+            type="button"
+            onClick={() => {
+              closeSidebar();
+              navigate("/owner");
+            }}
+            className="
+              w-full
+              flex
+              items-center
+              gap-4
+              px-4
+              py-3
+              rounded-xl
+              bg-green-50
+              text-green-700
+              font-semibold
+            "
+          >
+            <span>⌂</span>
+
+            <span>
+              Dashboard
+            </span>
+          </button>
+
+          {/* PAYMENTS */}
+
+          <button
+            type="button"
+            onClick={() => {
+              closeSidebar();
+              navigate("/owner/payments");
+            }}
+            className="
+              w-full
+              flex
+              items-center
+              gap-4
+              px-4
+              py-3
+              rounded-xl
+              text-slate-700
+              hover:bg-slate-50
+            "
+          >
+            <span>₹</span>
+
+            <span>
+              Payments
+            </span>
+          </button>
+
+          {/* WORK HISTORY */}
+
+          <button
+            type="button"
+            onClick={openAllVehicles}
+            className="
+              w-full
+              flex
+              items-center
+              gap-4
+              px-4
+              py-3
+              rounded-xl
+              text-slate-700
+              hover:bg-slate-50
+            "
+          >
+            <span>▤</span>
+
+            <span>
+              Work History
+            </span>
+          </button>
+
+          {/* CUSTOMERS */}
+
+          <button
+            type="button"
+            onClick={() => {
+              closeSidebar();
+              navigate("/owner/customers");
+            }}
+            className="
+              w-full
+              flex
+              items-center
+              gap-4
+              px-4
+              py-3
+              rounded-xl
+              text-slate-700
+              hover:bg-slate-50
+            "
+          >
+            <span>♙</span>
+
+            <span>
+              Customers
+            </span>
+          </button>
+
+          {/* DRIVERS */}
+
+          <button
+            type="button"
+            onClick={openDrivers}
+            className="
+              w-full
+              flex
+              items-center
+              gap-4
+              px-4
+              py-3
+              rounded-xl
+              text-slate-700
+              hover:bg-slate-50
+            "
+          >
+            <span>🚚</span>
+
+            <span>
+              Drivers
+            </span>
+          </button>
+
+          {/* VEHICLE TYPES */}
+
+          <button
+            type="button"
+            onClick={closeSidebar}
+            className="
+              w-full
+              flex
+              items-center
+              gap-4
+              px-4
+              py-3
+              rounded-xl
+              text-slate-700
+              hover:bg-slate-50
+            "
+          >
+            <span>🚜</span>
+
+            <span>
+              Vehicle Types
+            </span>
+          </button>
+
+          {/* PROFIT HISTORY */}
+
+          <button
+            type="button"
+            onClick={closeSidebar}
+            className="
+              w-full
+              flex
+              items-center
+              gap-4
+              px-4
+              py-3
+              rounded-xl
+              text-slate-700
+              hover:bg-slate-50
+            "
+          >
+            <span>▥</span>
+
+            <span>
+              Profit History
+            </span>
+          </button>
+
+          {/* PROFILE */}
+
+          <button
+            type="button"
+            onClick={openProfile}
+            className="
+              w-full
+              flex
+              items-center
+              gap-4
+              px-4
+              py-3
+              rounded-xl
+              text-slate-700
+              hover:bg-slate-50
+            "
+          >
+            <span>♙</span>
+
+            <span>
+              Profile
+            </span>
+          </button>
+
+          {/* REFER & EARN */}
+
+          <button
+            type="button"
+            onClick={closeSidebar}
+            className="
+              w-full
+              flex
+              items-center
+              gap-4
+              px-4
+              py-3
+              rounded-xl
+              text-slate-700
+              hover:bg-slate-50
+            "
+          >
+            <span>🎁</span>
+
+            <span>
+              Refer & Earn
+            </span>
+          </button>
+
+          {/* LOGOUT */}
+
+          <button
+            type="button"
+            onClick={() => {
+              closeSidebar();
+
+              localStorage.removeItem(
+                "JWT_TOKEN"
+              );
+
+              navigate("/login");
+            }}
+            className="
+              w-full
+              flex
+              items-center
+              gap-4
+              px-4
+              py-3
+              mt-2
+              rounded-xl
+              text-red-600
+              hover:bg-red-50
+            "
+          >
+            <span>→</span>
+
+            <span>
+              Logout
+            </span>
+          </button>
+
+        </div>
+
+      </aside>
+
+      {/* =================================================
+          MAIN CONTENT
       ================================================= */}
 
       <main
@@ -728,21 +1123,61 @@ function OwnerDashboard() {
           "
         >
 
-          <div className="flex justify-between items-center">
+          <div
+            className="
+              flex
+              justify-between
+              items-center
+            "
+          >
 
-            <div>
+            <div
+              className="
+                flex
+                items-center
+                gap-3
+              "
+            >
 
-              <h1 className="text-lg md:text-2xl font-bold">
-                WorkHistory
-              </h1>
+              {/* MOBILE MENU */}
 
-              <p className="text-xs md:text-sm">
-                Owner Dashboard
-              </p>
+              <button
+                type="button"
+                onClick={() =>
+                  setSidebarOpen(true)
+                }
+                className="
+                  md:hidden
+                  w-10
+                  h-10
+                  rounded-xl
+                  bg-green-600
+                  flex
+                  items-center
+                  justify-center
+                  text-xl
+                "
+              >
+                ☰
+              </button>
+
+              <div>
+                <h1 className="text-lg md:text-2xl font-bold">
+                  WorkHistory
+                </h1>
+
+                <p className="text-xs md:text-sm">
+                  Owner Dashboard
+                </p>
+              </div>
 
             </div>
 
-            <div
+            {/* PROFILE */}
+
+            <button
+              type="button"
+              onClick={openProfile}
               className="
                 w-9
                 h-9
@@ -753,16 +1188,20 @@ function OwnerDashboard() {
                 items-center
                 justify-center
                 font-bold
+                hover:bg-green-50
+                active:scale-95
+                transition
+                cursor-pointer
               "
             >
-
               VS
-
-            </div>
+            </button>
 
           </div>
 
         </header>
+
+        {/* CONTENT */}
 
         <div
           className="
@@ -801,12 +1240,10 @@ function OwnerDashboard() {
 
             </div>
 
-            <h2 className="text-3xl font-bold text-slate-900 mt-1">
+            {/* REDUCED FROM text-3xl TO text-2xl */}
 
-              {formatMoney(
-                totalEarnings
-              )}
-
+            <h2 className="text-2xl font-bold text-slate-900 mt-1">
+              {formatMoney(totalEarnings)}
             </h2>
 
             <div
@@ -818,21 +1255,23 @@ function OwnerDashboard() {
               "
             >
 
+              {/* PAID */}
+
               <div>
 
                 <p className="text-xs text-slate-500">
                   Paid
                 </p>
 
-                <p className="text-lg font-bold text-green-600">
+                {/* REDUCED FROM text-lg TO text-base */}
 
-                  {formatMoney(
-                    totalPaid
-                  )}
-
+                <p className="text-base font-bold text-green-600">
+                  {formatMoney(totalPaid)}
                 </p>
 
               </div>
+
+              {/* PENDING */}
 
               <div
                 className="
@@ -846,12 +1285,10 @@ function OwnerDashboard() {
                   Pending
                 </p>
 
-                <p className="text-lg font-bold text-orange-500">
+                {/* REDUCED FROM text-lg TO text-base */}
 
-                  {formatMoney(
-                    totalPending
-                  )}
-
+                <p className="text-base font-bold text-orange-500">
+                  {formatMoney(totalPending)}
                 </p>
 
               </div>
@@ -866,13 +1303,9 @@ function OwnerDashboard() {
 
           <section className="mt-6">
 
-            <div className="flex justify-between items-center mb-3">
-
-              <h2 className="text-xl font-bold">
-                Quick Actions
-              </h2>
-
-            </div>
+            <h2 className="text-xl font-bold mb-3">
+              Quick Actions
+            </h2>
 
             <div
               className="
@@ -885,10 +1318,9 @@ function OwnerDashboard() {
               {/* PAYMENTS */}
 
               <button
+                type="button"
                 onClick={() =>
-                  navigate(
-                    "/owner/payments"
-                  )
+                  navigate("/owner/payments")
                 }
                 className="
                   bg-white
@@ -914,9 +1346,7 @@ function OwnerDashboard() {
                     text-xl
                   "
                 >
-
                   ₹
-
                 </div>
 
                 <p className="text-xs mt-1">
@@ -928,9 +1358,8 @@ function OwnerDashboard() {
               {/* HISTORY */}
 
               <button
-                onClick={
-                  openAllVehicles
-                }
+                type="button"
+                onClick={openAllVehicles}
                 className="
                   bg-white
                   border
@@ -955,9 +1384,7 @@ function OwnerDashboard() {
                     text-xl
                   "
                 >
-
                   ▤
-
                 </div>
 
                 <p className="text-xs mt-1">
@@ -969,10 +1396,9 @@ function OwnerDashboard() {
               {/* CUSTOMERS */}
 
               <button
+                type="button"
                 onClick={() =>
-                  navigate(
-                    "/owner/customers"
-                  )
+                  navigate("/owner/customers")
                 }
                 className="
                   bg-white
@@ -998,9 +1424,7 @@ function OwnerDashboard() {
                     text-xl
                   "
                 >
-
                   ♙
-
                 </div>
 
                 <p className="text-xs mt-1">
@@ -1009,9 +1433,11 @@ function OwnerDashboard() {
 
               </button>
 
-              {/* PROFILE */}
+              {/* DRIVERS */}
 
               <button
+                type="button"
+                onClick={openDrivers}
                 className="
                   bg-white
                   border
@@ -1036,13 +1462,11 @@ function OwnerDashboard() {
                     text-xl
                   "
                 >
-
-                  ♙
-
+                  🚚
                 </div>
 
                 <p className="text-xs mt-1">
-                  Profile
+                  Drivers
                 </p>
 
               </button>
@@ -1057,26 +1481,29 @@ function OwnerDashboard() {
 
           <section className="mt-6">
 
-            <div className="flex justify-between items-center mb-3">
+            <div
+              className="
+                flex
+                justify-between
+                items-center
+                mb-3
+              "
+            >
 
               <h2 className="text-xl font-bold">
                 Work by Vehicle
               </h2>
 
               <button
-                onClick={
-                  openAllVehicles
-                }
+                type="button"
+                onClick={openAllVehicles}
                 className="
                   text-sm
                   text-green-600
                   font-semibold
-                  active:scale-95
                 "
               >
-
                 See all →
-
               </button>
 
             </div>
@@ -1138,11 +1565,9 @@ function OwnerDashboard() {
                           text-xl
                         "
                       >
-
                         {getVehicleIcon(
                           vehicle
                         )}
-
                       </div>
 
                       <div>
@@ -1151,14 +1576,14 @@ function OwnerDashboard() {
                           {vehicle}
                         </p>
 
-                        <p className="text-sm font-bold">
+                        {/* REDUCED FROM text-sm TO text-xs */}
 
+                        <p className="text-xs font-bold">
                           {formatMoney(
                             vehicleTotals[
                               vehicle
                             ] || 0
                           )}
-
                         </p>
 
                       </div>
@@ -1172,9 +1597,7 @@ function OwnerDashboard() {
                         font-bold
                       "
                     >
-
                       →
-
                     </span>
 
                   </button>
@@ -1207,19 +1630,14 @@ function OwnerDashboard() {
 
               <button
                 type="button"
-                onClick={
-                  openRecentWorkHistory
-                }
+                onClick={openRecentWorkHistory}
                 className="
                   text-green-600
                   font-semibold
                   text-sm
-                  active:scale-95
                 "
               >
-
                 See all →
-
               </button>
 
             </div>
@@ -1238,16 +1656,13 @@ function OwnerDashboard() {
                   text-slate-500
                 "
               >
-
                 Loading recent work...
-
               </div>
 
             )}
 
             {!loading &&
-              recentWorks.length ===
-                0 && (
+              recentWorks.length === 0 && (
 
                 <div
                   className="
@@ -1269,8 +1684,7 @@ function OwnerDashboard() {
                   </p>
 
                   <p className="text-xs text-slate-500 mt-1">
-                    Add your first work
-                    record.
+                    Add your first work record.
                   </p>
 
                 </div>
@@ -1278,16 +1692,12 @@ function OwnerDashboard() {
               )}
 
             {!loading &&
-              recentWorks.length >
-                0 && (
+              recentWorks.length > 0 && (
 
                 <div className="space-y-2.5">
 
                   {recentWorks.map(
-                    (
-                      work,
-                      index
-                    ) => {
+                    (work, index) => {
 
                       const vehicle =
                         formatVehicle(
@@ -1295,7 +1705,6 @@ function OwnerDashboard() {
                         );
 
                       return (
-
                         <div
                           key={
                             work.id ||
@@ -1344,11 +1753,9 @@ function OwnerDashboard() {
                                   shrink-0
                                 "
                               >
-
                                 {getVehicleIcon(
                                   work.machine
                                 )}
-
                               </div>
 
                               <div className="min-w-0">
@@ -1361,10 +1768,8 @@ function OwnerDashboard() {
                                     truncate
                                   "
                                 >
-
                                   {work.customerName ||
                                     "Customer"}
-
                                 </p>
 
                                 <p
@@ -1375,7 +1780,6 @@ function OwnerDashboard() {
                                     truncate
                                   "
                                 >
-
                                   {vehicle}
 
                                   <span className="mx-1">
@@ -1384,7 +1788,6 @@ function OwnerDashboard() {
 
                                   {work.workType ||
                                     "Work"}
-
                                 </p>
 
                               </div>
@@ -1405,11 +1808,9 @@ function OwnerDashboard() {
                                   text-slate-900
                                 "
                               >
-
                                 {formatMoney(
                                   work.amount
                                 )}
-
                               </p>
 
                               <p
@@ -1419,11 +1820,9 @@ function OwnerDashboard() {
                                   mt-0.5
                                 "
                               >
-
                                 {formatDate(
                                   work.date
                                 )}
-
                               </p>
 
                             </div>
@@ -1431,9 +1830,7 @@ function OwnerDashboard() {
                           </div>
 
                         </div>
-
                       );
-
                     }
                   )}
 
@@ -1448,7 +1845,7 @@ function OwnerDashboard() {
       </main>
 
       {/* =================================================
-          MOBILE BOTTOM NAV
+          MOBILE BOTTOM NAVIGATION
       ================================================= */}
 
       <div
@@ -1472,6 +1869,7 @@ function OwnerDashboard() {
         {/* HOME */}
 
         <button
+          type="button"
           onClick={() =>
             navigate("/owner")
           }
@@ -1483,21 +1881,18 @@ function OwnerDashboard() {
             text-[10px]
           "
         >
-
           <span className="text-lg">
             ⌂
           </span>
 
           Home
-
         </button>
 
         {/* HISTORY */}
 
         <button
-          onClick={
-            openAllVehicles
-          }
+          type="button"
+          onClick={openAllVehicles}
           className="
             flex
             flex-col
@@ -1506,22 +1901,19 @@ function OwnerDashboard() {
             text-[10px]
           "
         >
-
           <span className="text-lg">
             ▤
           </span>
 
           History
-
         </button>
 
-        {/* ADD */}
+        {/* ADD WORK */}
 
         <button
+          type="button"
           onClick={() =>
-            navigate(
-              "/owner/add-work"
-            )
+            navigate("/owner/add-work")
           }
           className="
             -mt-8
@@ -1539,18 +1931,15 @@ function OwnerDashboard() {
             justify-center
           "
         >
-
           +
-
         </button>
 
         {/* CUSTOMERS */}
 
         <button
+          type="button"
           onClick={() =>
-            navigate(
-              "/owner/customers"
-            )
+            navigate("/owner/customers")
           }
           className="
             flex
@@ -1560,18 +1949,18 @@ function OwnerDashboard() {
             text-[10px]
           "
         >
-
           <span className="text-lg">
             ♙
           </span>
 
           Customers
-
         </button>
 
-        {/* PROFILE */}
+        {/* DRIVERS */}
 
         <button
+          type="button"
+          onClick={openDrivers}
           className="
             flex
             flex-col
@@ -1580,13 +1969,11 @@ function OwnerDashboard() {
             text-[10px]
           "
         >
-
           <span className="text-lg">
-            ♙
+            🚚
           </span>
 
-          Profile
-
+          Drivers
         </button>
 
       </div>
